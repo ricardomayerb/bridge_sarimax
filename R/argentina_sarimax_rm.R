@@ -10,6 +10,8 @@ data_path <- "./data/excel_data/Argentina.xlsx"
 
 arg_m <- read_excel(data_path, sheet = "monthly")
 
+
+# playing with dates, to educate ourselves
 final_date_dec <- 2019 + (11/12) 
 
 print(date_decimal(final_date_dec))
@@ -69,17 +71,19 @@ monthly_arima_tbl <- tibble(id = arima_names, data = as.list(data_m_ts),
                             dates_max = date_decimal(dec_dates_max),
                             final_date = 2020,
                             date_diff = final_date - dec_dates_max,
-                            months_diff = 12 * date_diff) 
+                            months_diff = 12 * date_diff,
+                            fc_ind_h = map2(fit, list(months_diff), forecast,
+                                            h )) 
 
 
 fc_m <- map(arima_list_m, forecast, h = 7) 
-fc_m <- map2(arima_list_m, h_list, forecast, h = .y) 
+# fc_m <- map2(arima_list_m, h_list, forecast, h = .y) 
 
 # names(fc_m) <- arima_names
 
 
-
-
-fit <- auto.arima(my_varible)
-plot(forecast(fit, h = 20))
-summary(fit)
+# 
+# 
+# fit <- auto.arima(my_varible)
+# plot(forecast(fit, h = 20))
+# summary(fit)
