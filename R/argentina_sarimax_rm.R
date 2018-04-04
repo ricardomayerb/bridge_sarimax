@@ -4,10 +4,22 @@ library(tidyverse)
 library(readxl)
 library(timetk)
 library(tictoc)
+library(lubridate)
 
 data_path <- "./data/excel_data/Argentina.xlsx"
 
 arg_m <- read_excel(data_path, sheet = "monthly")
+
+final_date_dec <- 2019 + (11/12) 
+
+print(date_decimal(final_date_dec))
+
+year(date_decimal(final_date_dec))
+
+month(date_decimal(final_date_dec))
+
+zoo::as.yearmon(final_date_dec)
+
 
 country_m <- arg_m 
 
@@ -52,10 +64,11 @@ foo <- as.list(data_m_ts)
 monthly_arima_tbl <- tibble(id = arima_names, data = as.list(data_m_ts),
                             data_na_rm = map(data, na.omit),
                             fit = arima_list_m, 
-                            indiv_dates = map(data_na_rm, time),
-                            max_dates = unlist(map(indiv_dates, max)),
+                            dec_dates = map(data_na_rm, time),
+                            dec_dates_max = unlist(map(dec_dates, max)),
+                            dates_max = date_decimal(dec_dates_max),
                             final_date = 2020,
-                            date_diff = final_date - max_dates,
+                            date_diff = final_date - dec_dates_max,
                             months_diff = 12 * date_diff) 
 
 
