@@ -37,8 +37,7 @@ data_m_ts <- tk_ts(country_m, frequency = 12,
 
 data_m_ts <- data_m_ts[ , arima_names]
 
-# print(names(country_m)[1:4])
-# ncol(country_m)
+arima_list_m <- list()
 
 tic()
 for (i in seq_along(arima_names)) {
