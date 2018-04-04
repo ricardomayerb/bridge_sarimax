@@ -63,7 +63,8 @@ names(arima_list_m) <- arima_names
 
 foo <- as.list(data_m_ts)
 
-monthly_arima_tbl <- tibble(id = arima_names, data = as.list(data_m_ts),
+monthly_arima_tbl <- tibble(id = arima_names, 
+                            data = as.list(data_m_ts),
                             data_na_rm = map(data, na.omit),
                             fit = arima_list_m, 
                             dec_dates = map(data_na_rm, time),
@@ -71,19 +72,46 @@ monthly_arima_tbl <- tibble(id = arima_names, data = as.list(data_m_ts),
                             dates_max = date_decimal(dec_dates_max),
                             final_date = 2020,
                             date_diff = final_date - dec_dates_max,
-                            months_diff = 12 * date_diff,
-                            fc_ind_h = map2(fit, list(months_diff), forecast,
-                                            h )) 
+                            months_diff = 12 * date_diff
+)
 
+h_vec <- monthly_arima_tbl[["months_diff"]]
+
+h_list <- as.list(monthly_arima_tbl$months_diff)
+
+bad_arima <- arima_list_m[[16]]
+bad_fc <- forecast(bad_arima, h = 23)
+plot(bad_fc)
+
+bfit <- auto.arima(data_m_ts[,16])
+summary(bfit)
+summary(bad_arima)
+
+plot(forecast(bfit, h = 20))
+
+for (i in seq_along(arima_names)) {
+  print(paste("i =", i, ",", arima_names[i]))
+  this_arima <- arima_list_m[[i]]
+  this_h <- h_vec[i]
+  print(this_h)
+  this_fc <- forecast(this_arima, h = 25)
+  
+}
+
+fc_m_h <- map2(arima_list_m, h_vec, forecast) 
 
 fc_m <- map(arima_list_m, forecast, h = 7) 
+
+monthly_fc_tbl <- monthly_arima_tbl %>% 
+  mutate(fc = map2(.x = fit, .y = months_diff, 
+                              ~ forecast(fit, h = months_diff)
+                   )
+  )
+
+
 # fc_m <- map2(arima_list_m, h_list, forecast, h = .y) 
 
 # names(fc_m) <- arima_names
 
 
-# 
-# 
-# fit <- auto.arima(my_varible)
-# plot(forecast(fit, h = 20))
-# summary(fit)
+
