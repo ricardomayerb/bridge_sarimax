@@ -46,11 +46,28 @@ rgdp_seasonal <- c(country_rgdp_dmetra$BP, country_rgdp_dmetra$BD,
                    country_rgdp_dmetra$BQ)
 rgdp_inc_mean <- ifelse(country_rgdp_dmetra$Mean == 1, TRUE, FALSE)
 
-arima_gdp <- Arima(rgdp_ts, order = rgdp_order,
-                   seasonal = rgdp_seasonal, 
-                   include.mean = rgdp_inc_mean,
-                   lambda = 0, 
-                   biasadj = TRUE)
+## rgdp
+
+ari_for_tsCV <- function(my_data, this_order, this_seasonal, this_mean = FALSE, 
+                         this_lambda = 0, this_bias = TRUE, this_xreg = NULL, h = 1) {
+ 
+   my_arima_obj <- Arima(my_data, 
+                         order = this_order,
+        seasonal = this_seasonal, 
+        include.mean = this_mean,
+        lambda = this_lambda, 
+        biasadj = this_bias,
+        xreg = this_xreg)
+  
+  my_fc_obj <- forecast(my_arima_obj, h = h)
+  
+  return(my_fc_obj)
+}
+
+e <- rgdp_ts %>% tsCV(forecastfunction = ari_for_tsCV, this_order = rgdp_order, this_seasonal=rgdp_seasonal, h = 4)
+e
+
+tic()
 
 arima_list <- list()
 
@@ -213,6 +230,10 @@ arima_gdp_cpi <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
                    biasadj = TRUE,
                    xreg = lag.xts(x_cpi, k=0))
 
+e <- rgdp_ts %>% tsCV(forecastfunction = ari_for_tsCV, this_order = rgdp_order, this_seasonal=rgdp_seasonal, 
+                      this_xreg = x_cpi, h = 4)
+e
+
 arima_gdp_cpi <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
                        seasonal = rgdp_seasonal, 
                        include.mean = rgdp_inc_mean,
@@ -236,5 +257,6 @@ arima_gdp_cpicore <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_ord
 
 summary(arima_gdp_cpicore )
 summary(arima_gdp_cpi )
+
 
 
