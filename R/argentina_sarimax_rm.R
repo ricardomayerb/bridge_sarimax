@@ -37,7 +37,6 @@ country_rgdp_dmetra <- country_dmetra %>%
 country_monthly_dmetra <- country_dmetra %>% 
   filter(id != "rgdp") %>% select(- freq_type)
 
-
 country_monthly_dmetra$id <- as.factor(country_monthly_dmetra$id) 
 
 rgdp_order <- c(country_rgdp_dmetra$P, country_rgdp_dmetra$D,
@@ -46,25 +45,7 @@ rgdp_seasonal <- c(country_rgdp_dmetra$BP, country_rgdp_dmetra$BD,
                    country_rgdp_dmetra$BQ)
 rgdp_inc_mean <- ifelse(country_rgdp_dmetra$Mean == 1, TRUE, FALSE)
 
-ari_for_tsCV <- function(my_data, this_order, this_seasonal, this_mean = FALSE, 
-                         this_lambda = 0, this_bias = TRUE, this_xreg = NULL, h = 1) {
- 
-   my_arima_obj <- Arima(my_data, 
-                         order = this_order,
-        seasonal = this_seasonal, 
-        include.mean = this_mean,
-        lambda = this_lambda, 
-        biasadj = this_bias,
-        xreg = this_xreg)
-  
-  my_fc_obj <- forecast(my_arima_obj, h = h)
-  
-  return(my_fc_obj)
-}
 
-e <- rgdp_ts %>% tsCV(forecastfunction=ari_for_tsCV, this_order = rgdp_order,
-                      this_seasonal=rgdp_seasonal, h = 4)
-e
 
 arima_list <- list()
 
@@ -94,21 +75,25 @@ for (i in seq_along(country_monthly_dmetra$id)) {
 }
 toc()
 
+arima_gdp <- Arima(rgdp_ts, order = rgdp_order,
+                   seasonal = rgdp_seasonal, 
+                   include.mean = rgdp_inc_mean,
+                   lambda = 0, 
+                   biasadj = TRUE)
 
 # p q P Q freq d D  
 arima_order_names <- c("p_r", "q_r", "P_r", "Q_r", "freq_r", "d_r", "D_r")
 arima_list_m_order <- list()
 
 # rgdp
-foo <- arima_gdp[["arma"]]
-names(foo) <- arima_order_names; foo
+gdp_r_par <- arima_gdp[["arma"]]
+names(gdp_r_par) <- arima_order_names
 
+gdp_r_par_tbl <- tibble(id_r = "rgdp", p_r = gdp_r_par[1], q_r = gdp_r_par[2], 
+       P_r = gdp_r_par[3], Q_r = gdp_r_par[4], freq_r = gdp_r_par[5], 
+       d_r = gdp_r_par[6], D_r = gdp_r_par[7])
 
-moo <- tibble(id_r = "rgdp", p_r = foo[1], q_r = foo[2], 
-       P_r = foo[3], Q_r = foo[4], freq_r = foo[5], 
-       d_r = foo[6], D_r = foo[7])
-
-dmetra_and_r_order_rgdp <- cbind(moo, country_rgdp_dmetra)
+dmetra_and_r_order_rgdp <- cbind(gdp_r_par_tbl, country_rgdp_dmetra)
 dmetra_and_r_order_rgdp[,  c("BIC", "N", "Seasonal", "Q-val", "SE(res)", "Log", "Mean", "id_r")] <- NULL
 
 dmetra_and_r_order_rgdp$pdiff  <-  dmetra_and_r_order_rgdp$p_r - dmetra_and_r_order_rgdp$P
@@ -217,43 +202,78 @@ ext_series_xts_monthly <- tk_xts(ext_monthly_series_tbl, date_var = date)
 
 ext_series_xts_quarterly <- apply.quarterly(ext_series_xts_monthly , mean) 
 
-x_cpi <- ext_series_xts_quarterly$cpi
-x_cpi <- x_cpi["1993/2017-12"]
+rgdp_arimax_list <- list()
+tic()
+for (i in seq_along(arima_names)) {
   
-arima_gdp_cpi <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
-                   seasonal = rgdp_seasonal, 
-                   include.mean = rgdp_inc_mean,
-                   lambda = 0, 
-                   biasadj = TRUE,
-                   xreg = lag.xts(x_cpi, k=0))
+  print(i)
+  
+  x_series <-  ext_series_xts_quarterly[, 1] 
+  x_series <- x_series["1993/2017-12"]
+  
+  this_arimax <- list_along(1:3)
+  
+  arima_gdp_x_0 <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
+                         seasonal = rgdp_seasonal, 
+                         include.mean = rgdp_inc_mean,
+                         lambda = 0, 
+                         biasadj = TRUE,
+                         xreg = lag.xts(x_cpi, k=0))
+  
+  arima_gdp_x_1 <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
+                         seasonal = rgdp_seasonal, 
+                         include.mean = rgdp_inc_mean,
+                         lambda = 0, 
+                         biasadj = TRUE,
+                         xreg = lag.xts(x_cpi, k=1))
+  
+  arima_gdp_x_2 <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
+                         seasonal = rgdp_seasonal, 
+                         include.mean = rgdp_inc_mean,
+                         lambda = 0, 
+                         biasadj = TRUE,
+                         xreg = lag.xts(x_cpi, k=2))
+  
+  this_arimax[[1]] <- arima_gdp_x_0
+  this_arimax[[2]] <- arima_gdp_x_1
+  this_arimax[[3]] <- arima_gdp_x_2
+  
+  rgdp_arimax_list[[i]] <-  this_arimax
+  
+}
+toc()
 
-e <- rgdp_ts %>% tsCV(forecastfunction = ari_for_tsCV, this_order = rgdp_order, this_seasonal=rgdp_seasonal, 
-                      this_xreg = x_cpi, h = 4)
-e
+names(rgdp_arimax_list) <- arima_names
 
-arima_gdp_cpi <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
-                       seasonal = rgdp_seasonal, 
-                       include.mean = rgdp_inc_mean,
-                       lambda = 0, 
-                       biasadj = TRUE,
-                       xreg = lag.xts(x_cpi, k=1))
 
-arima_gdp_cpi <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
-                       seasonal = rgdp_seasonal, 
-                       include.mean = rgdp_inc_mean,
-                       lambda = 0, 
-                       biasadj = TRUE,
-                       xreg = lag.xts(x_cpi, k=2))
+## cross validation part
 
-arima_gdp_cpicore <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
-                       seasonal = rgdp_seasonal, 
-                       include.mean = rgdp_inc_mean,
-                       lambda = 0, 
-                       biasadj = TRUE,
-                       xreg = coredata(x_cpi))
 
-summary(arima_gdp_cpicore )
-summary(arima_gdp_cpi )
+
+ari_for_tsCV <- function(my_data, this_order, this_seasonal, this_mean = FALSE, 
+                         this_lambda = 0, this_bias = TRUE, h = 1) {
+  
+  my_arima_obj <- Arima(my_data, 
+                        order = this_order,
+                        seasonal = this_seasonal, 
+                        include.mean = this_mean,
+                        lambda = this_lambda, 
+                        biasadj = this_bias)
+  
+  my_fc_obj <- forecast(my_arima_obj, h = h)
+  
+  return(my_fc_obj)
+}
+
+e_rgdp_1 <- rgdp_ts %>% tsCV(forecastfunction=ari_for_tsCV, this_order = rgdp_order,
+                             this_seasonal=rgdp_seasonal, h = 1)
+e_rgdp_4 <- rgdp_ts %>% tsCV(forecastfunction=ari_for_tsCV, this_order = rgdp_order,
+                             this_seasonal=rgdp_seasonal, h = 4)e_rgdp_4
+
+mse_1 <- mean(e_rgdp_1^2, na.rm = TRUE)
+mse_4 <- mean(e_rgdp_4^2, na.rm = TRUE)
+rmse_1 <- sqrt(mse_1)
+rmse_4 <- sqrt(mse_4)
 
 
 
