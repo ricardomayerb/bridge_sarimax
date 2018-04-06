@@ -46,8 +46,6 @@ rgdp_seasonal <- c(country_rgdp_dmetra$BP, country_rgdp_dmetra$BD,
                    country_rgdp_dmetra$BQ)
 rgdp_inc_mean <- ifelse(country_rgdp_dmetra$Mean == 1, TRUE, FALSE)
 
-## rgdp
-
 ari_for_tsCV <- function(my_data, this_order, this_seasonal, this_mean = FALSE, 
                          this_lambda = 0, this_bias = TRUE, this_xreg = NULL, h = 1) {
  
@@ -64,10 +62,9 @@ ari_for_tsCV <- function(my_data, this_order, this_seasonal, this_mean = FALSE,
   return(my_fc_obj)
 }
 
-e <- rgdp_ts %>% tsCV(forecastfunction = ari_for_tsCV, this_order = rgdp_order, this_seasonal=rgdp_seasonal, h = 4)
+e <- rgdp_ts %>% tsCV(forecastfunction=ari_for_tsCV, this_order = rgdp_order,
+                      this_seasonal=rgdp_seasonal, h = 4)
 e
-
-tic()
 
 arima_list <- list()
 
