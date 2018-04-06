@@ -52,26 +52,9 @@ arima_gdp <- Arima(rgdp_ts, order = rgdp_order,
                    lambda = 0, 
                    biasadj = TRUE)
 
-
-
-arima_gdp <- Arima(rgdp_ts, order = rgdp_order,
-                   seasonal = rgdp_seasonal, 
-                   include.mean = rgdp_inc_mean,
-                   lambda = 0, 
-                   biasadj = TRUE,
-                   xreg = )
-
-
-
-# rgdp_arima_dmetra <- Arima(y = log_rgdp, order = rgdp_order,
-#                            seasonal = rgdp_seasonal, 
-#                            include.mean = rgdp_inc_mean)
-
-tic()
-
 arima_list <- list()
 
-
+tic()
 for (i in seq_along(country_monthly_dmetra$id)) {
   
   print(i)
