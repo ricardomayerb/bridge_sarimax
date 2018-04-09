@@ -380,16 +380,16 @@ arimax_cv <- function(y_ts, xreg_ts, win_len, n_cv, x_maxlag, h_max) {
   
 
 
-
-arcv <- arimax_cv(y_ts = rgdp_ts, xreg_ts = myts1, x_maxlag = 2, 
-                  win_len = 16, n_cv = 8, h_max = 4)  
+# 
+# arcv <- arimax_cv(y_ts = rgdp_ts, xreg_ts = myts1, x_maxlag = 2, 
+#                   win_len = 16, n_cv = 8, h_max = 4)  
 
 
 arcv <- arimax_cv(y_ts = rgdp_ts, xreg_ts = myts2, x_maxlag = 2, 
                   win_len = 16, n_cv = 8, h_max = 4)  
 
-arcv <- arimax_cv(y_ts = rgdp_ts, xreg_ts = ext_series_ts_quarterly, 
-                  x_maxlag = 2, win_len = 16, n_cv = 8, h_max = 4)  
+# arcv <- arimax_cv(y_ts = rgdp_ts, xreg_ts = ext_series_ts_quarterly, 
+#                   x_maxlag = 2, win_len = 16, n_cv = 8, h_max = 4)  
 
 
 # for (xlag in seq.int(0, x_maxlag)) {
