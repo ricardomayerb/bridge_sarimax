@@ -47,7 +47,7 @@ rgdp_inc_mean <- ifelse(country_rgdp_dmetra$Mean == 1, TRUE, FALSE)
 
 
 
-arima_list <- list()
+arima_list <- list_along(arima_names)
 
 tic()
 for (i in seq_along(country_monthly_dmetra$id)) {
@@ -134,7 +134,7 @@ dmetra_and_r_order$Ddiff  <-  dmetra_and_r_order$D_r - dmetra_and_r_order$BD
 # playing with dates, to educate ourselves
 final_date_dec <- 2019 + (11/12) 
 
-arima_list_m <- list()
+arima_list_m <- list_along(arima_names)
 
 tic()
 for (i in seq_along(arima_names)) {
@@ -200,9 +200,11 @@ ext_monthly_series_tbl <- cbind(tibble(date = index_date), ext_monthly_series_tb
 
 ext_series_xts_monthly <- tk_xts(ext_monthly_series_tbl, date_var = date)
 
-ext_series_xts_quarterly <- apply.quarterly(ext_series_xts_monthly , mean) 
+ext_series_xts_quarterly <- apply.quarterly(ext_series_xts_monthly , mean)
 
-rgdp_arimax_list <- list()
+ext_series_ts_quarterly <- tk_ts(ext_series_xts_quarterly, start = c(1993,1), frequency = 4)
+
+rgdp_arimax_list <- list_along(arima_names)
 tic()
 for (i in seq_along(arima_names)) {
   
@@ -218,21 +220,21 @@ for (i in seq_along(arima_names)) {
                          include.mean = rgdp_inc_mean,
                          lambda = 0, 
                          biasadj = TRUE,
-                         xreg = lag.xts(x_cpi, k=0))
+                         xreg = lag.xts(x_series, k=0))
   
   arima_gdp_x_1 <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
                          seasonal = rgdp_seasonal, 
                          include.mean = rgdp_inc_mean,
                          lambda = 0, 
                          biasadj = TRUE,
-                         xreg = lag.xts(x_cpi, k=1))
+                         xreg = lag.xts(x_series, k=1))
   
   arima_gdp_x_2 <- Arima(window(rgdp_ts, start = c(1993, 1)), order = rgdp_order,
                          seasonal = rgdp_seasonal, 
                          include.mean = rgdp_inc_mean,
                          lambda = 0, 
                          biasadj = TRUE,
-                         xreg = lag.xts(x_cpi, k=2))
+                         xreg = lag.xts(x_series, k=2))
   
   this_arimax[[1]] <- arima_gdp_x_0
   this_arimax[[2]] <- arima_gdp_x_1
@@ -246,34 +248,233 @@ toc()
 names(rgdp_arimax_list) <- arima_names
 
 
+myts1 <- ext_series_ts_quarterly[, 1]
+myts2 <- ext_series_ts_quarterly[, 1:2]
+
 ## cross validation part
 
+rgdp_tscv_list <- list_along(arima_names)
 
+arimax_cv <- function(y_ts, xreg_ts, win_len, n_cv, x_maxlag, h_max) {
+  
+  i = 1
+  ny_without_na <- length(na.omit(y_ts)) 
+  n <- length(y_ts)
+  
+  print(paste("n :", n))
+  print(paste("nnonas :", ny_without_na))
+  
+  cv_all_errors_list <- list()
 
-ari_for_tsCV <- function(my_data, this_order, this_seasonal, this_mean = FALSE, 
-                         this_lambda = 0, this_bias = TRUE, h = 1) {
+  for (x_regressor in 1:ncol(as.matrix(xreg_ts))) {
+    
+    print(arima_names[x_regressor])
+    
+    if (is.null(ncol(xreg_ts))) {
+      x_series <-  xreg_ts
+    } else {
+      x_series <-  xreg_ts[ , x_regressor]
+    }
+
+    x_same_end_as_y <-  window(x_series, end = c(2017, 4))
+      
+    n_x <- length(x_same_end_as_y)
+    
+    x_var_cv_errors <- matrix(data = NA, nrow = n_cv, ncol = h_max)
+
+    for (i in seq_along(1:n_cv)) {
+        
+      train_plus_test_plus_im1 <- win_len + h_max + (i - 1)
+      start_training_index_y <-  n - train_plus_test_plus_im1 + 1
+      end_training_index_y <-  start_training_index_y + win_len - 1
+      start_test_index_y <- end_training_index_y + 1
+      end_test_index_y <- start_test_index_y + h_max - 1
+        
+      print(paste("start training _y:", start_training_index_y))
+      print(paste("training length", win_len))
+      print(paste("end_training _y:", end_training_index_y))
+      print(paste("start test _y:", start_test_index_y))
+      print(paste("end test_y :", end_test_index_y))
+      
+      start_training_index_x <-  n_x - train_plus_test_plus_im1 + 1
+      end_training_index_x <-  start_training_index_x + win_len - 1
+      start_test_index_x <- end_training_index_x + 1
+      end_test_index_x <- start_test_index_x + h_max - 1
+      
+      print(paste("start training x:", start_training_index_x))
+      print(paste("end_training x :", end_training_index_x))
+      print(paste("start test x:", start_test_index_x))
+      print(paste("end test x:", end_test_index_x))
+      
+      print("y_ts")
+      print(y_ts)
+      
+      print("x_same_end_as_y")
+      print(x_same_end_as_y)
+      
+      
+      
+      training_y <- subset(y_ts, 
+                           start = start_training_index_y,
+                           end = end_training_index_y)
+      
+      print("training_y")
+      print(training_y)
+      
+      training_x <- subset(x_same_end_as_y,
+                           start = start_training_index_x,
+                           end = end_training_index_x)
+      
+      print("training_x")
+      print(training_x)
+      
+      test_y <- subset(y_ts, 
+                       start = start_test_index_y,
+                       end = end_test_index_y)
+      
+      print("test_y")
+      print(test_y)
+      
+      test_x <- subset(x_same_end_as_y,
+                       start = start_test_index_x,
+                       end = end_test_index_x)
+      
+      print("test_x")
+      print(test_x)
+      
+      arimax_lagged <- Arima(training_y, order = rgdp_order,
+                             seasonal = rgdp_seasonal,
+                             include.mean = rgdp_inc_mean,
+                             lambda = 0,
+                             biasadj = TRUE,
+                             xreg = training_x)
+      
+      fc <- forecast(arimax_lagged, h = h_max, xreg = test_x)
+      
+      print("fc$mean")
+      print(fc$mean)
+      
+      
+      
+      fc_error <- test_y - fc$mean
+      print("fc_error")
+      print(fc_error)
+      
+      x_var_cv_errors[i, ] <- fc_error
+
+    }
+    
+    print("x_var_cv_errors")
+    print(x_var_cv_errors)
+    
+    cv_all_errors_list[[x_regressor]] <- x_var_cv_errors
+    
+  }
   
-  my_arima_obj <- Arima(my_data, 
-                        order = this_order,
-                        seasonal = this_seasonal, 
-                        include.mean = this_mean,
-                        lambda = this_lambda, 
-                        biasadj = this_bias)
+  print("cv_all_errors_list")
+  print(cv_all_errors_list)
   
-  my_fc_obj <- forecast(my_arima_obj, h = h)
+  return(cv_all_errors_list)
   
-  return(my_fc_obj)
 }
+  
 
-e_rgdp_1 <- rgdp_ts %>% tsCV(forecastfunction=ari_for_tsCV, this_order = rgdp_order,
-                             this_seasonal=rgdp_seasonal, h = 1)
-e_rgdp_4 <- rgdp_ts %>% tsCV(forecastfunction=ari_for_tsCV, this_order = rgdp_order,
-                             this_seasonal=rgdp_seasonal, h = 4)e_rgdp_4
 
-mse_1 <- mean(e_rgdp_1^2, na.rm = TRUE)
-mse_4 <- mean(e_rgdp_4^2, na.rm = TRUE)
-rmse_1 <- sqrt(mse_1)
-rmse_4 <- sqrt(mse_4)
 
+arcv <- arimax_cv(y_ts = rgdp_ts, xreg_ts = myts1, x_maxlag = 2, 
+                  win_len = 16, n_cv = 8, h_max = 4)  
+
+
+arcv <- arimax_cv(y_ts = rgdp_ts, xreg_ts = myts2, x_maxlag = 2, 
+                  win_len = 16, n_cv = 8, h_max = 4)  
+
+arcv <- arimax_cv(y_ts = rgdp_ts, xreg_ts = ext_series_ts_quarterly, 
+                  x_maxlag = 2, win_len = 16, n_cv = 8, h_max = 4)  
+
+
+# for (xlag in seq.int(0, x_maxlag)) {
+#   
+#   this_lagged_x <- lag.xts(x_series, k = xlag)
+  
+
+
+# 
+# for( i in seq_along(1:num_of_cv_elements)){
+#   
+#   
+#   new_y <- subset(rgdp_ts, start = n - training_set_length - max_h - i + 1 + 1,
+#          end = n - max_h - i + 1)
+#   foo_list <- list() 
+#   for (j in seq_along(arima_names)) {
+#     x_series <-  ext_series_ts_quarterly[, 1]
+#     x_series <-  window(x_series, end = c(2017, 4))
+#     new_x <- subset(x_series, start = n - training_set_length - max_h - i + 1 + 1,
+#                     end = n - max_h - i + 1)
+#     
+#     this_arimax <- list_along(1:3)
+#     
+#     arima_gdp_x_0 <- Arima(new_y, order = rgdp_order,
+#                            seasonal = rgdp_seasonal, 
+#                            include.mean = rgdp_inc_mean,
+#                            lambda = 0, 
+#                            biasadj = TRUE,
+#                            xreg = lag.xts(new_x, k=0))
+#     
+#     
+#     
+#     arima_gdp_x_1 <- Arima(new_y,  order = rgdp_order,
+#                            seasonal = rgdp_seasonal, 
+#                            include.mean = rgdp_inc_mean,
+#                            lambda = 0, 
+#                            biasadj = TRUE,
+#                            xreg = lag.xts(new_x, k=1))
+#     
+#     arima_gdp_x_2 <- Arima(new_y, order = rgdp_order,
+#                            seasonal = rgdp_seasonal, 
+#                            include.mean = rgdp_inc_mean,
+#                            lambda = 0, 
+#                            biasadj = TRUE,
+#                            xreg = lag.xts(new_x, k=2))
+#     
+#     this_arimax[[1]] <- arima_gdp_x_0
+#     this_arimax[[2]] <- arima_gdp_x_1
+#     this_arimax[[3]] <- arima_gdp_x_2
+#     
+#     foo_list[[j]] <- this_arimax
+#     
+#   }
+#   
+#   
+# 
+# }
+# 
+# rgdp_ts
+# new_y
+# 
+# ari_for_tsCV <- function(my_data, this_order, this_seasonal, this_mean = FALSE, 
+#                          this_lambda = 0, this_bias = TRUE, h = 1) {
+#   
+#   my_arima_obj <- Arima(my_data, 
+#                         order = this_order,
+#                         seasonal = this_seasonal, 
+#                         include.mean = this_mean,
+#                         lambda = this_lambda, 
+#                         biasadj = this_bias)
+#   
+#   my_fc_obj <- forecast(my_arima_obj, h = h)
+#   
+#   return(my_fc_obj)
+# }
+# 
+# e_rgdp_1 <- rgdp_ts %>% tsCV(forecastfunction=ari_for_tsCV, this_order = rgdp_order,
+#                              this_seasonal=rgdp_seasonal, h = 1)
+# e_rgdp_4 <- rgdp_ts %>% tsCV(forecastfunction=ari_for_tsCV, this_order = rgdp_order,
+#                              this_seasonal=rgdp_seasonal, h = 4)
+# 
+# mse_1 <- mean(e_rgdp_1^2, na.rm = TRUE)
+# mse_4 <- mean(e_rgdp_4^2, na.rm = TRUE)
+# rmse_1 <- sqrt(mse_1)
+# rmse_4 <- sqrt(mse_4)
+# 
 
 
