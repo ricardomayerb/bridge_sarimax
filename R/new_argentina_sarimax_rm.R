@@ -31,8 +31,10 @@ fit_arima_monthly_list_dem <- fit_arimas(
   y_ts = monthly_ts, order_list = demetra_output[["monthly_order_list"]],
   this_arima_names = monthly_names)
 
+tic()
 fit_arima_rgdp_list_r <- fit_arimas(
   y_ts = rgdp_ts, auto = TRUE, this_arima_names = "rgdp")
+toc()
 
 fit_arima_monthly_list_r <- fit_arimas(
   y_ts = monthly_ts, auto = TRUE)
@@ -46,13 +48,14 @@ monthly_order_r <- get_order_from_arima(fit_arima_monthly_list_r,
                                         suffix = "r",
                                         this_arima_names = monthly_names)
 
-
 monthly_order_dm <- get_order_from_arima(fit_arima_monthly_list_dem, 
                                          suffix = "dm",
                                          this_arima_names = monthly_names)
 
+
 monthly_order_r_df <- t(as.data.frame(monthly_order_r))
 monthly_order_dm_df <- t(as.data.frame(monthly_order_dm))
+
 monthly_order_both_df <- cbind(monthly_order_r_df, monthly_order_dm_df)
 
 monthly_order_both_diff_df <- as.data.frame(monthly_order_both_df) %>%
