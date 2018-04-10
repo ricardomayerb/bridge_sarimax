@@ -197,3 +197,88 @@ get_order_from_arima <- function(arima_obj, suffix = NULL,
   return(order_par_list)
   
 }
+
+compare_two_orders <- function(ord1, ord2, vec_of_names) {
+  
+  ord1_df <- t(as.data.frame(ord1))
+  ord2_df <- t(as.data.frame(ord2))
+  
+  order_both_df <- cbind(ord1_df, ord2_df)
+  
+  order_both_diff_df <- as.data.frame(order_both_df) %>%
+    mutate(p_diff = p_r - p_dm, q_diff = q_r - q_dm, d_diff = d_r - d_dm,
+           P_diff = P_r - P_dm, Q_diff = Q_r - Q_dm, D_diff = D_r - D_dm) %>%
+    select(c(p_diff, q_diff, d_diff, P_diff, Q_diff, D_diff)) %>% 
+    mutate(id = vec_of_names)
+  
+  return(
+    list(diffs = order_both_diff_df, both = order_both_df)
+    )
+}
+
+
+glue_x_mean <- function(ts1, ts2, freq = 12) {
+  
+  ts1_new_length <- length(ts1) - length(ts2)
+  ts1_new_data <- ts1[1:ts1_new_length]
+  
+  ts12 <- ts( data = c(ts1_new_data, ts2), 
+              frequency = freq,
+              start = stats::start(ts1)
+  )
+  
+  return(ts12)
+}
+
+extend_and_qtr <- function(data_mts, final_horizon_date, vec_of_names, 
+                           fitted_arima_list, start_date_gdp) {
+  
+  fc_list_m <- list() 
+  extended_m_ts_list <- list()
+  
+  final_year <- final_horizon_date[1]
+  final_month <- final_horizon_date[2] - 1
+  
+  final_horizon_decimal <- final_year + final_month/12
+  
+  for (i in seq_along(vec_of_names)) {
+
+    this_arima <- fitted_arima_list[[i]]
+    monthly_series <- data_mts[, vec_of_names[i]]
+    
+    series_date_max <- monthly_series %>% na.omit() %>% time %>% max
+    diff_decimal <- final_horizon_decimal - series_date_max 
+    diff_in_month <- as.integer(12 * diff_decimal)
+    
+    this_fc <- forecast(this_arima, h = diff_in_month)
+    
+    fc_mean <- this_fc$mean
+    
+    extended_monthly_series <- glue_x_mean(monthly_series, fc_mean)
+    
+    fc_list_m[[i]] <- this_fc
+    extended_m_ts_list[[i]] <- extended_monthly_series
+    
+  }
+  
+  names(fc_list_m) <- vec_of_names
+  names(extended_m_ts_list) <- vec_of_names
+  
+  ext_monthly_series_mts <- reduce(extended_m_ts_list, ts.union)
+  colnames(ext_monthly_series_mts) <- vec_of_names
+  
+  index_date <- as.Date(time(ext_monthly_series_mts))
+  
+  ext_monthly_series_tbl <- as.tibble(ext_monthly_series_mts) 
+  ext_monthly_series_tbl <- cbind(tibble(date = index_date), ext_monthly_series_tbl)
+  
+  ext_series_xts_monthly <- tk_xts(ext_monthly_series_tbl, date_var = date)
+  
+  ext_series_xts_quarterly <- apply.quarterly(ext_series_xts_monthly , mean)
+  
+  ext_series_ts_quarterly <- tk_ts(ext_series_xts_quarterly, 
+                                   start = start_date_gdp, frequency = 4)
+  
+  return(ext_series_ts_quarterly)
+  
+}

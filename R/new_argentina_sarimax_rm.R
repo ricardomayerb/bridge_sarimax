@@ -8,6 +8,11 @@ library(timetk)
 library(tictoc)
 library(lubridate)
 
+
+# preliminaries -----------------------------------------------------------
+
+final_forecast_horizon <- c(2019, 12)
+
 data_path <- "./data/excel_data/Argentina.xlsx"
 
 gdp_and_dates <- get_rgdp_and_dates(data_path)
@@ -23,21 +28,27 @@ rgdp_ts <- ts(data = gdp_and_dates[["gdp_data"]],
 
 demetra_output <- get_demetra_params(data_path)
 
+tic()
 fit_arima_rgdp_list_dem <- fit_arimas(
   y_ts = rgdp_ts, order_list = demetra_output[["rgdp_order_list"]],
   this_arima_names = "rgdp")
+toc()
 
+tic()
 fit_arima_monthly_list_dem <- fit_arimas(
   y_ts = monthly_ts, order_list = demetra_output[["monthly_order_list"]],
   this_arima_names = monthly_names)
+toc()
 
 tic()
 fit_arima_rgdp_list_r <- fit_arimas(
   y_ts = rgdp_ts, auto = TRUE, this_arima_names = "rgdp")
 toc()
 
+tic()
 fit_arima_monthly_list_r <- fit_arimas(
   y_ts = monthly_ts, auto = TRUE)
+toc()
 
 gdp_order_r <- get_order_from_arima(fit_arima_rgdp_list_r)[[1]]
 gdp_order_dm <- get_order_from_arima(fit_arima_rgdp_list_dem)[[1]]
@@ -53,15 +64,17 @@ monthly_order_dm <- get_order_from_arima(fit_arima_monthly_list_dem,
                                          this_arima_names = monthly_names)
 
 
-monthly_order_r_df <- t(as.data.frame(monthly_order_r))
-monthly_order_dm_df <- t(as.data.frame(monthly_order_dm))
+comparison_of_orders <- compare_two_orders(monthly_order_r, monthly_order_dm, 
+                                           monthly_names)  
 
-monthly_order_both_df <- cbind(monthly_order_r_df, monthly_order_dm_df)
+monthly_ext_ts_dm <- extend_and_qtr(data_mts = monthly_ts, 
+                                 final_horizon_date = final_forecast_horizon , 
+                                 vec_of_names = monthly_names, 
+                                 fitted_arima_list = fit_arima_monthly_list_dem,
+                                 start_date_gdp = gdp_and_dates[["gdp_start"]])
 
-monthly_order_both_diff_df <- as.data.frame(monthly_order_both_df) %>%
-  mutate(p_diff = p_r - p_dm, q_diff = q_r - q_dm, d_diff = d_r - d_dm,
-         P_diff = P_r - P_dm, Q_diff = Q_r - Q_dm, D_diff = D_r - D_dm) %>%
-  select(c(p_diff, q_diff, d_diff, P_diff, Q_diff, D_diff)) %>% 
-  mutate(id = monthly_names)
-  
-  
+monthly_ext_ts_r <- extend_and_qtr(data_mts = monthly_ts, 
+                                    final_horizon_date = final_forecast_horizon , 
+                                    vec_of_names = monthly_names, 
+                                    fitted_arima_list = fit_arima_monthly_list_r,
+                                    start_date_gdp = gdp_and_dates[["gdp_start"]])
