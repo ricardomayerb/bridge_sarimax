@@ -89,6 +89,13 @@ get_demetra_params <- function(data_path) {
   rgdp_seasonal <- c(rgdp_demetra$P_dm, rgdp_demetra$D_dm, rgdp_demetra$Q_dm)
   rgdp_inc_mean <- ifelse(rgdp_demetra$Mean == 1, TRUE, FALSE)
   
+  this_instruction <- list(order = rgdp_order, seasonal = rgdp_seasonal,
+                           mean_logical = rgdp_inc_mean)
+  
+  rgdp_order_list <- list()
+  
+  rgdp_order_list[[1]] <- this_instruction 
+  
   monthly_demetra_order_list <- list_along(monthly_names)
  
   for (i in seq_along(monthly_names)) {
@@ -101,10 +108,10 @@ get_demetra_params <- function(data_path) {
     
     inc_mean <- ifelse(monthly_demetra$Mean[i] == 1, TRUE, FALSE)
     
-    this_instructions <- list(order = this_order, seasonal = this_seasonal,
+    this_instruction <- list(order = this_order, seasonal = this_seasonal,
                               mean_logical = inc_mean)
 
-    monthly_demetra_order_list[[i]] <- this_instructions
+    monthly_demetra_order_list[[i]] <- this_instruction
   }
   
   names(monthly_demetra_order_list) <- monthly_names
@@ -112,9 +119,81 @@ get_demetra_params <- function(data_path) {
   return(list(monthly_order_list = monthly_demetra_order_list,
               monthly_info_tbl = monthly_demetra,
               monthly_pdqPDQ = monthly_demetra_pdqPDQ,
+              rgdp_order_list = rgdp_order_list,
               rgdp_info_tbl = rgdp_demetra,
               rgdp_pqdPDQ = rgdp_demetra_pdqPDQ) 
-  )
+         )
+}
+
+fit_arimas <- function(y_ts, auto = FALSE, order_list = NULL, my_lambda = 0,
+                       my_biasadj = TRUE, this_arima_names = NULL) {
   
+  n_of_series <- ncol(y_ts)
+  
+  if (is.null(n_of_series)) {
+    n_of_series <- 1
+  }
+  
+  
+  fit_arimas_list <- list_along(seq.int(1, n_of_series))
+  
+  for (i in seq.int(1, n_of_series)) {
+    
+    this_y <- y_ts[, i]
+    
+    if (!auto) {
+      this_instruction <- order_list[[i]]
+      this_order <- this_instruction[["order"]]
+      this_seasonal <- this_instruction[["seasonal"]]
+      this_mean <- this_instruction[["mean_logical"]]
+      
+      fit <- Arima(y = this_y, order = this_order, seasonal = this_seasonal,
+                  include.mean = this_mean, lambda = my_lambda, 
+                  biasadj = my_biasadj)
+      
+    } else {
+      
+      fit <- auto.arima(y = this_y, lambda = my_lambda, biasadj = my_biasadj)
+      
+    }
+    
+    fit_arimas_list[[i]] <- fit
+    
+  }
+  
+  names(fit_arimas_list) <- this_arima_names
+  
+  return(fit_arimas_list)
+  
+}
+
+
+get_order_from_arima <- function(arima_obj, suffix = NULL, 
+                                 this_arima_names = NULL) {
+  
+  len_obj <- length(arima_obj)
+  
+  order_names <- c("p", "q", "P", "Q", "freq", "d", "D")
+  
+  if (!is.null(suffix)) {
+    order_names <- paste(order_names, suffix, sep = "_")
+  }
+  
+  order_par_list <- list_along(seq.int(1, len_obj))
+  
+  for (i in seq.int(1, len_obj)) {
+    
+    this_arima <- arima_obj[[i]]
+    arma_par <- this_arima[["arma"]]
+    names(arma_par) <- order_names
+    
+    order_par_list[[i]] <- arma_par
+    
+  }
+  
+  
+  names(order_par_list) <- this_arima_names
+  
+  return(order_par_list)
   
 }
