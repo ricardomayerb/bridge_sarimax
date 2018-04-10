@@ -36,8 +36,11 @@ fit_arima_rgdp_list_r <- fit_arimas(
   y_ts = rgdp_ts, auto = TRUE, this_arima_names = "rgdp")
 toc()
 
+tic()
 fit_arima_monthly_list_r <- fit_arimas(
   y_ts = monthly_ts, auto = TRUE)
+toc()
+
 
 gdp_order_r <- get_order_from_arima(fit_arima_rgdp_list_r)[[1]]
 gdp_order_dm <- get_order_from_arima(fit_arima_rgdp_list_dem)[[1]]
