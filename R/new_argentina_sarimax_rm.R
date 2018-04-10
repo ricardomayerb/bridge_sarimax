@@ -20,11 +20,13 @@ gdp_and_dates <- get_rgdp_and_dates(data_path)
 monthly_data <- get_monthly_variables(data_path = data_path)
 
 monthly_ts <- make_monthly_ts(monthly_data)
+monthly_ts  <- log(monthly_ts)
 
 monthly_names <- colnames(monthly_ts)
 
 rgdp_ts <- ts(data = gdp_and_dates[["gdp_data"]], 
               start = gdp_and_dates[["gdp_start"]], frequency = 4)
+rgdp_ts <- log(rgdp_ts)
 
 demetra_output <- get_demetra_params(data_path)
 
@@ -68,14 +70,22 @@ monthly_order_dm <- get_order_from_arima(fit_arima_monthly_list_dem,
 comparison_of_orders <- compare_two_orders(monthly_order_r, monthly_order_dm, 
                                            monthly_names)  
 
-monthly_ext_ts_dm <- extend_and_qtr(data_mts = monthly_ts, 
+mdata_ext_ts_dm <- extend_and_qtr(data_mts = monthly_ts, 
                                  final_horizon_date = final_forecast_horizon , 
                                  vec_of_names = monthly_names, 
                                  fitted_arima_list = fit_arima_monthly_list_dem,
                                  start_date_gdp = gdp_and_dates[["gdp_start"]])
 
-monthly_ext_ts_r <- extend_and_qtr(data_mts = monthly_ts, 
+mdata_ext_ts_r <- extend_and_qtr(data_mts = monthly_ts, 
                                     final_horizon_date = final_forecast_horizon , 
                                     vec_of_names = monthly_names, 
                                     fitted_arima_list = fit_arima_monthly_list_r,
                                     start_date_gdp = gdp_and_dates[["gdp_start"]])
+
+roox <- mdata_ext_ts_r[["series_xts"]]
+roos <- mdata_ext_ts_r[["series_xts"]]
+
+doox <- mdata_ext_ts_dm[["series_xts"]]
+doos <- mdata_ext_ts_dm[["series_xts"]]
+
+

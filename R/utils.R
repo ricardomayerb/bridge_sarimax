@@ -125,8 +125,8 @@ get_demetra_params <- function(data_path) {
          )
 }
 
-fit_arimas <- function(y_ts, auto = FALSE, order_list = NULL, my_lambda = 0,
-                       my_biasadj = TRUE, this_arima_names = NULL) {
+fit_arimas <- function(y_ts, auto = FALSE, order_list = NULL, my_lambda = NULL,
+                       my_biasadj = FALSE, this_arima_names = NULL) {
   
   n_of_series <- ncol(y_ts)
   
@@ -269,16 +269,30 @@ extend_and_qtr <- function(data_mts, final_horizon_date, vec_of_names,
   
   index_date <- as.Date(time(ext_monthly_series_mts))
   
+  rgdp_start_year <- start_date_gdp[1]
+  rgdp_start_quarter <- start_date_gdp[2]
+  start_gdp_str <- paste0(rgdp_start_year, "-", rgdp_start_quarter, "/")
+
   ext_monthly_series_tbl <- as.tibble(ext_monthly_series_mts) 
   ext_monthly_series_tbl <- cbind(tibble(date = index_date), ext_monthly_series_tbl)
   
   ext_series_xts_monthly <- tk_xts(ext_monthly_series_tbl, date_var = date)
   
+  
+  
   ext_series_xts_quarterly <- apply.quarterly(ext_series_xts_monthly , mean)
+  ext_series_xts_monthly <- ext_series_xts_monthly[start_gdp_str]
   
   ext_series_ts_quarterly <- tk_ts(ext_series_xts_quarterly, 
-                                   start = start_date_gdp, frequency = 4)
+                                   start = c(rgdp_start_year, rgdp_start_quarter), 
+                                   frequency = 4)
   
-  return(ext_series_ts_quarterly)
+  
+  # chop off any obs previous to the start of gdp
+  
+  return(list(series_ts = ext_series_ts_quarterly,
+              series_xts = ext_series_xts_quarterly))
+  
+  # return(ext_series_ts_quarterly)
   
 }
