@@ -70,22 +70,39 @@ monthly_order_dm <- get_order_from_arima(fit_arima_monthly_list_dem,
 comparison_of_orders <- compare_two_orders(monthly_order_r, monthly_order_dm, 
                                            monthly_names)  
 
-mdata_ext_ts_dm <- extend_and_qtr(data_mts = monthly_ts, 
+mdata_ext_dm <- extend_and_qtr(data_mts = monthly_ts, 
                                  final_horizon_date = final_forecast_horizon , 
                                  vec_of_names = monthly_names, 
                                  fitted_arima_list = fit_arima_monthly_list_dem,
                                  start_date_gdp = gdp_and_dates[["gdp_start"]])
 
-mdata_ext_ts_r <- extend_and_qtr(data_mts = monthly_ts, 
+mdata_ext_r <- extend_and_qtr(data_mts = monthly_ts, 
                                     final_horizon_date = final_forecast_horizon , 
                                     vec_of_names = monthly_names, 
                                     fitted_arima_list = fit_arima_monthly_list_r,
                                     start_date_gdp = gdp_and_dates[["gdp_start"]])
 
-roox <- mdata_ext_ts_r[["series_xts"]]
-roos <- mdata_ext_ts_r[["series_xts"]]
+roox <- mdata_ext_r[["series_xts"]]
+roos <- mdata_ext_r[["series_ts"]]
 
-doox <- mdata_ext_ts_dm[["series_xts"]]
-doos <- mdata_ext_ts_dm[["series_xts"]]
+doox <- mdata_ext_dm[["series_xts"]]
+doos <- mdata_ext_dm[["series_ts"]]
 
+my_emae <- roos[, "emae"]
+
+rgdp_order_r <-  gdp_order_r[c("p", "d", "q")]
+rgdp_seasonal_r <-  gdp_order_r[c("P", "D", "Q")]
+
+marimax_r <- my_arimax(y_ts = rgdp_ts, xreg_ts = roos,  y_order = rgdp_order_r, 
+                 y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
+
+marimax_dm <- my_arimax(y_ts = rgdp_ts, xreg_ts = doos,  y_order = rgdp_order_r, 
+                       y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
+
+my_emaeip_r <- roos[, c("emae", "ip")]
+my_emaeip_dm <- doos[, c("emae", "ip")]
+
+mycv <- cv_arimax(y_ts = rgdp_ts, xreg_ts = roos,  h_max = 3, n_cv = 2,
+                  training_length = 12,  y_order = rgdp_order_r, 
+                  y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
 

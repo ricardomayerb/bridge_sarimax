@@ -281,7 +281,7 @@ extend_and_qtr <- function(data_mts, final_horizon_date, vec_of_names,
   
   
   ext_series_xts_quarterly <- apply.quarterly(ext_series_xts_monthly , mean)
-  ext_series_xts_monthly <- ext_series_xts_monthly[start_gdp_str]
+  ext_series_xts_quarterly <- ext_series_xts_quarterly[start_gdp_str]
   
   ext_series_ts_quarterly <- tk_ts(ext_series_xts_quarterly, 
                                    start = c(rgdp_start_year, rgdp_start_quarter), 
@@ -295,4 +295,301 @@ extend_and_qtr <- function(data_mts, final_horizon_date, vec_of_names,
   
   # return(ext_series_ts_quarterly)
   
+}
+
+
+my_arimax <- function(y_ts, xreg_ts, y_order, y_seasonal,
+                      y_include_mean = FALSE, 
+                      vec_of_names = NULL) {
+ 
+  i = 1
+  
+  y_ts <- na.omit(y_ts)
+  
+  y_time <- time(y_ts)
+  y_yqrt <- as.yearqtr(y_time)
+
+  y_end_year <- year(max( y_yqrt ))
+  y_end_quarter <- quarter(max( y_yqrt ))
+  
+  y_start_year <- year(min( y_yqrt ))
+  y_start_quarter <- quarter(min( y_yqrt ))
+
+  n <- length(y_ts)
+  
+  x_names <- colnames(xreg_ts)
+  
+  number_of_xregs <- ncol(as.matrix(xreg_ts))
+  
+  arimax_list <-  list()
+
+  for (x_regressor in 1:number_of_xregs) {
+
+    if (is.null(ncol(xreg_ts))) {
+      x_series <-  xreg_ts
+    } else {
+      x_series <-  xreg_ts[ , x_regressor]
+    }
+    
+    
+    x_as_y <- window(x_series, start = c(y_start_year, y_start_quarter),
+                              end = c(y_end_year, y_end_quarter),
+                     frequency = 4)
+
+    n_x <- length(x_as_y)
+    
+    this_arimax <- Arima(y = y_ts, xreg = x_as_y, 
+                         order = y_order, seasonal = y_seasonal,
+                         include.mean = y_include_mean )
+    
+    arimax_list[[x_regressor]] <- this_arimax
+
+    
+  }
+  
+  names(arimax_list) <- vec_of_names
+  
+  return(arimax_list)
+  
+
+}
+
+
+cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
+                      y_order, y_seasonal,
+                      y_include_mean = FALSE, 
+                      vec_of_names = NULL) {
+  
+  i = 1
+  y_ts <- na.omit(y_ts)
+  
+  y_time <- time(y_ts)
+  y_yqrt <- as.yearqtr(y_time)
+  
+  y_end_year <- year(max( y_yqrt ))
+  y_end_quarter <- quarter(max( y_yqrt ))
+  
+  y_start_year <- year(min( y_yqrt ))
+  y_start_quarter <- quarter(min( y_yqrt ))
+  
+  n <- length(y_ts)
+  
+  xreg_as_y <- window(xreg_ts, start = c(y_start_year, y_start_quarter),
+                   end = c(y_end_year, y_end_quarter), frequency = 4)
+  
+  n_x <- length(xreg_ts)
+  
+  number_of_xregs <- ncol(as.matrix(xreg_ts))
+  
+  for (x in 1:number_of_xregs) {
+    
+    if (is.null(ncol(xreg_as_y))) {
+      x_series <-  xreg_as_y
+    } else {
+      x_series <-  xreg_as_y[ , x]
+    }
+    
+    for (i in seq_along(1:n_cv)) {
+      
+      train_plus_test_plus_im1 <- training_length + h_max + (i - 1)
+      start_training_index_y <-  n - train_plus_test_plus_im1 + 1
+      end_training_index_y <-  start_training_index_y + training_length - 1
+      start_test_index_y <- end_training_index_y + 1
+      end_test_index_y <- start_test_index_y + h_max - 1
+      
+      print(paste("start training _y:", start_training_index_y))
+      print(paste("training length", training_length))
+      print(paste("end_training _y:", end_training_index_y))
+      print(paste("start test _y:", start_test_index_y))
+      print(paste("end test_y :", end_test_index_y))
+      
+      start_training_index_x <-  n_x - train_plus_test_plus_im1 + 1
+      end_training_index_x <-  start_training_index_x + training_length - 1
+      start_test_index_x <- end_training_index_x + 1
+      end_test_index_x <- start_test_index_x + h_max - 1
+      
+      print(paste("start training x:", start_training_index_x))
+      print(paste("end_training x :", end_training_index_x))
+      print(paste("start test x:", start_test_index_x))
+      print(paste("end test x:", end_test_index_x))
+      
+      print("y_ts")
+      print(y_ts)
+      
+      print("x_as_y")
+      print(x_series)
+      
+      training_y <- subset(y_ts, 
+                           start = start_training_index_y,
+                           end = end_training_index_y)
+      
+      print("training_y")
+      print(training_y)
+      
+      training_x <- subset(x_series,
+                           start = start_training_index_x,
+                           end = end_training_index_x)
+      
+      print("training_x")
+      print(training_x)
+      
+      test_y <- subset(y_ts, 
+                       start = start_test_index_y,
+                       end = end_test_index_y)
+      
+      print("test_y")
+      print(test_y)
+      
+      test_x <- subset(x_series,
+                       start = start_test_index_x,
+                       end = end_test_index_x)
+      
+      print("test_x")
+      print(test_x)
+      
+      this_arimax <- Arima(training_y, order = y_order,
+                           seasonal = y_seasonal,
+                           xreg = training_x)
+      
+      fc <- forecast(this_arimax, h = h_max, xreg = test_x)
+      
+      print("fc$mean")
+      print(fc$mean)
+      
+      fc_error <- test_y - fc$mean
+      print("fc_error")
+      print(fc_error)
+      
+      
+    }
+    
+    
+  
+  
+  
+  
+}
+
+
+
+
+i = 1
+ny_without_na <- length(na.omit(y_ts)) 
+n <- length(y_ts)
+
+print(paste("n :", n))
+print(paste("nnonas :", ny_without_na))
+
+cv_all_errors_list <- list()
+
+for (x_regressor in 1:ncol(as.matrix(xreg_ts))) {
+  
+  print(arima_names[x_regressor])
+  
+  if (is.null(ncol(xreg_ts))) {
+    x_series <-  xreg_ts
+  } else {
+    x_series <-  xreg_ts[ , x_regressor]
+  }
+  
+  x_same_end_as_y <-  window(x_series, end = c(2017, 4))
+  
+  n_x <- length(x_same_end_as_y)
+  
+  x_var_cv_errors <- matrix(data = NA, nrow = n_cv, ncol = h_max)
+  
+  for (i in seq_along(1:n_cv)) {
+    
+    train_plus_test_plus_im1 <- win_len + h_max + (i - 1)
+    start_training_index_y <-  n - train_plus_test_plus_im1 + 1
+    end_training_index_y <-  start_training_index_y + win_len - 1
+    start_test_index_y <- end_training_index_y + 1
+    end_test_index_y <- start_test_index_y + h_max - 1
+    
+    print(paste("start training _y:", start_training_index_y))
+    print(paste("training length", win_len))
+    print(paste("end_training _y:", end_training_index_y))
+    print(paste("start test _y:", start_test_index_y))
+    print(paste("end test_y :", end_test_index_y))
+    
+    start_training_index_x <-  n_x - train_plus_test_plus_im1 + 1
+    end_training_index_x <-  start_training_index_x + win_len - 1
+    start_test_index_x <- end_training_index_x + 1
+    end_test_index_x <- start_test_index_x + h_max - 1
+    
+    print(paste("start training x:", start_training_index_x))
+    print(paste("end_training x :", end_training_index_x))
+    print(paste("start test x:", start_test_index_x))
+    print(paste("end test x:", end_test_index_x))
+    
+    print("y_ts")
+    print(y_ts)
+    
+    print("x_same_end_as_y")
+    print(x_same_end_as_y)
+    
+    
+    
+    training_y <- subset(y_ts, 
+                         start = start_training_index_y,
+                         end = end_training_index_y)
+    
+    print("training_y")
+    print(training_y)
+    
+    training_x <- subset(x_same_end_as_y,
+                         start = start_training_index_x,
+                         end = end_training_index_x)
+    
+    print("training_x")
+    print(training_x)
+    
+    test_y <- subset(y_ts, 
+                     start = start_test_index_y,
+                     end = end_test_index_y)
+    
+    print("test_y")
+    print(test_y)
+    
+    test_x <- subset(x_same_end_as_y,
+                     start = start_test_index_x,
+                     end = end_test_index_x)
+    
+    print("test_x")
+    print(test_x)
+    
+    arimax_lagged <- Arima(training_y, order = rgdp_order,
+                           seasonal = rgdp_seasonal,
+                           include.mean = rgdp_inc_mean,
+                           lambda = 0,
+                           biasadj = TRUE,
+                           xreg = training_x)
+    
+    fc <- forecast(arimax_lagged, h = h_max, xreg = test_x)
+    
+    print("fc$mean")
+    print(fc$mean)
+    
+    
+    
+    fc_error <- test_y - fc$mean
+    print("fc_error")
+    print(fc_error)
+    
+    x_var_cv_errors[i, ] <- fc_error
+    
+  }
+  
+  print("x_var_cv_errors")
+  print(x_var_cv_errors)
+  
+  cv_all_errors_list[[x_regressor]] <- x_var_cv_errors
+  
+}
+
+print("cv_all_errors_list")
+print(cv_all_errors_list)
+
+return(cv_all_errors_list)
+
 }
