@@ -102,7 +102,24 @@ marimax_dm <- my_arimax(y_ts = rgdp_ts, xreg_ts = doos,  y_order = rgdp_order_r,
 my_emaeip_r <- roos[, c("emae", "ip")]
 my_emaeip_dm <- doos[, c("emae", "ip")]
 
-mycv <- cv_arimax(y_ts = rgdp_ts, xreg_ts = roos,  h_max = 3, n_cv = 2,
-                  training_length = 12,  y_order = rgdp_order_r, 
+tic()
+# using conteporary xregs (k = 0)
+mycv0 <- cv_arimax(y_ts = rgdp_ts, xreg_ts = roos,  h_max = 6, n_cv = 8,
+                  training_length = 16,  y_order = rgdp_order_r, 
                   y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
 
+# using conteporary xregs (k = 1)
+mycv1 <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 1),  h_max = 6, n_cv = 8,
+                   training_length = 16,  y_order = rgdp_order_r, 
+                   y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
+
+# using conteporary xregs (k = 2)
+mycv2 <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 2),  h_max = 6, n_cv = 8,
+                   training_length = 16,  y_order = rgdp_order_r, 
+                   y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
+toc()
+
+# peek at mycv1 members
+mycv1[["emae"]] 
+
+mycv1[["cpi"]] 
