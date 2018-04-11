@@ -280,7 +280,7 @@ extend_and_qtr <- function(data_mts, final_horizon_date, vec_of_names,
   
   
   
-  ext_series_xts_quarterly <- apply.quarterly(ext_series_xts_monthly , mean, na.rm = TRUE)
+  ext_series_xts_quarterly <- apply.quarterly(ext_series_xts_monthly , mean)
   ext_series_xts_quarterly <- ext_series_xts_quarterly[start_gdp_str]
   
   ext_series_ts_quarterly <- tk_ts(ext_series_xts_quarterly, 
@@ -358,7 +358,7 @@ my_arimax <- function(y_ts, xreg_ts, y_order, y_seasonal,
 cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
                       y_order, y_seasonal,
                       y_include_mean = FALSE, 
-                      vec_of_names = NULL, method = "CSS") {
+                      vec_of_names = NULL) {
   
   i = 1
   y_ts <- na.omit(y_ts)
@@ -400,170 +400,88 @@ cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
       end_training_index_y <-  start_training_index_y + training_length - 1
       start_test_index_y <- end_training_index_y + 1
       end_test_index_y <- start_test_index_y + h_max - 1
-
+      
+      # print(paste("start training _y:", start_training_index_y))
+      # print(paste("training length", training_length))
+      # print(paste("end_training _y:", end_training_index_y))
+      # print(paste("start test _y:", start_test_index_y))
+      # print(paste("end test_y :", end_test_index_y))
+      
       start_training_index_x <-  n_x - train_plus_test_plus_im1 + 1
       end_training_index_x <-  start_training_index_x + training_length - 1
       start_test_index_x <- end_training_index_x + 1
       end_test_index_x <- start_test_index_x + h_max - 1
-
+      
+      # print(paste("start training x:", start_training_index_x))
+      # print(paste("end_training x :", end_training_index_x))
+      # print(paste("start test x:", start_test_index_x))
+      # print(paste("end test x:", end_test_index_x))
+      # 
+      # print("y_ts")
+      # print(y_ts)
+      # 
+      # print("x_series")
+      # print(x_series)
       
       training_y <- subset(y_ts, 
                            start = start_training_index_y,
                            end = end_training_index_y)
-
+      
+      # print("training_y")
+      # print(training_y)
       
       training_x <- subset(x_series,
                            start = start_training_index_x,
                            end = end_training_index_x)
+      
+      # print("training_x")
+      # print(training_x)
 
       test_y <- subset(y_ts, 
                        start = start_test_index_y,
                        end = end_test_index_y)
-
+      
+      # print("test_y")
+      # print(test_y)
+      
       test_x <- subset(x_series,
                        start = start_test_index_x,
                        end = end_test_index_x)
+      
+      # print("test_x")
+      # print(test_x)
+      
 
+      
       this_arimax <- Arima(training_y, order = y_order,
                            seasonal = y_seasonal,
-                           xreg = training_x,
-                           method = method)
+                           xreg = training_x)
+      
+
       
       this_fc <- forecast(this_arimax, h = h_max, xreg = test_x)
-
+      
+      # print("this_fc$mean")
+      # print(this_fc$mean)
+      
+      
+      
       fc_error <- test_y - this_fc$mean
-
+      # print("fc_error")
+      # print(fc_error)
+      
       cv_errors_this_x[[i]] <- fc_error
+      
+      
       
     }
     
     cv_errors_all_pairs_yx[[x]] <- cv_errors_this_x
   }
   
-  cv_errors_all_pairs_yx <- map(cv_errors_all_pairs_yx, reduce, rbind)
+  cv_errors_all_pairs_yx <- map(mycv1, reduce, rbind)
   names(cv_errors_all_pairs_yx) <- vec_of_names
   return(cv_errors_all_pairs_yx)
-}
 
 
-cv_arima <- function(y_ts,  h_max, n_cv, training_length,
-                      y_order, y_seasonal,
-                      y_include_mean = FALSE, 
-                      method = "CSS") {
-  
-  i = 1
-  y_ts <- na.omit(y_ts)
-  
-  y_time <- time(y_ts)
-  y_yqrt <- as.yearqtr(y_time)
-  
-  y_end_year <- year(max( y_yqrt ))
-  y_end_quarter <- quarter(max( y_yqrt ))
-  
-  y_start_year <- year(min( y_yqrt ))
-  y_start_quarter <- quarter(min( y_yqrt ))
-  
-  n <- length(y_ts)
-  
-  cv_errors <- list_along(1:n_cv)
-  
-  for (i in seq_along(1:n_cv)) {
-      
-    train_plus_test_plus_im1 <- training_length + h_max + (i - 1)
-    start_training_index_y <-  n - train_plus_test_plus_im1 + 1
-    end_training_index_y <-  start_training_index_y + training_length - 1
-    start_test_index_y <- end_training_index_y + 1
-    end_test_index_y <- start_test_index_y + h_max - 1
-      
-    training_y <- subset(y_ts, 
-                         start = start_training_index_y,
-                         end = end_training_index_y)
-      
-    test_y <- subset(y_ts, 
-                     start = start_test_index_y,
-                     end = end_test_index_y)
-      
-    this_arima <- Arima(training_y, order = y_order,
-                        seasonal = y_seasonal,
-                        method = method)
-      
-    this_fc <- forecast(this_arima, h = h_max)
-      
-    fc_error <- test_y - this_fc$mean
-      
-    cv_errors[[i]] <- fc_error
-      
-  }
-  
-  cv_errors <- reduce(cv_errors, rbind)
-  
-  return(cv_errors)
-  
-}
-  
-
-
-
-compute_rmse <- function(mycv, h_max, n_cv, col_weights_vec = NULL,
-                         row_weights_vec = NULL) {
-  
-  vec_h <- 1:h_max
-  vec_cv <- 1:n_cv
-  
-  horizon_names <- paste("h = ", vec_h)
-  cv_names <- paste("cv = ", vec_cv)
-  
-  same_h_mse <- colMeans(mycv^2, na.rm = T)
-  same_h_rmse <- same_h_mse %>% sqrt()
-  same_h_rmse <- as.data.frame(t(same_h_rmse))
-  colnames(same_h_rmse) <- horizon_names 
-  
-  across_hs_mse <- rowMeans(mycv^2, na.rm = T)
-  across_hs_rmse <- across_hs_mse %>% sqrt()
-  across_hs_rmse <- as.data.frame(t(across_hs_rmse))
-  colnames(across_hs_rmse) <- cv_names 
-  
-  if(is.null(col_weights_vec))
-    col_weights_vec <- seq(1/length(vec_h), by = 0, length.out = length(vec_h))
-  else col_weights_vec <- col_weights_vec
-  
-  weighted_same_h_rmse_all_hs <- weighted.mean(same_h_rmse, col_weights_vec)
-
-  if(is.null(row_weights_vec))
-    row_weights_vec <- seq(1/length(vec_cv), by = 0, length.out = length(vec_cv))
-  else row_weights_vec <- row_weights_vec
-  
-  weighted_across_h_rmse_all_cvs <- weighted.mean(across_hs_rmse, row_weights_vec)
-  
-  return(list(same_h_rmse = same_h_rmse, 
-              across_hs_rmse = across_hs_rmse,
-              weighted_same_h = weighted_same_h_rmse_all_hs,
-              weighted_across_hs = weighted_across_h_rmse_all_cvs))
-}
-
-
-forecast_xreg <- function(arimax_list, xreg_mts, h, vec_of_names = NULL) {
-  
-  n_vars <- length(arimax_list)
-  
-  fc_list <- list()
-  
-  for(i in seq.int(1, n_vars)) {
-
-    this_arimax <- arimax_list[[i]]
-    this_series <- xreg_mts[,i]
-    
-    n_obs <- length(this_series)
-    
-    series_for_fc <- this_series[(n_obs-h+1) : n_obs]
-    
-    this_fc <- forecast(this_arimax, h = h, xreg = series_for_fc)
-    
-    fc_list[[i]] <- this_fc
-    
-  }
-  
-  names(fc_list) <- vec_of_names
-  return(fc_list)
-  
 }

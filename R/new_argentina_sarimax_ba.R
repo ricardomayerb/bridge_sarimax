@@ -8,11 +8,10 @@ library(timetk)
 library(tictoc)
 library(lubridate)
 
-tic()
+
 # preliminaries -----------------------------------------------------------
 
 final_forecast_horizon <- c(2019, 12)
-h_max = 8 # last rgdp data is 2017 Q4
 
 data_path <- "./data/excel_data/Argentina.xlsx"
 
@@ -104,67 +103,44 @@ my_emaeip_dm <- doos[, c("emae", "ip")]
 
 tic()
 # using contemporary xregs (k = 0)
-cv0_e_r <- cv_arimax(y_ts = rgdp_ts, xreg_ts = roos,  h_max = h_max, n_cv = 8,
+cv0_e_r <- cv_arimax(y_ts = rgdp_ts, xreg_ts = roos,  h_max = 6, n_cv = 8,
                   training_length = 16,  y_order = rgdp_order_r, 
-                  y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names,
-                  method = "ML")
+                  y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
 
-cv0_e_dm <- cv_arimax(y_ts = rgdp_ts, xreg_ts = doos,  h_max =  h_max, n_cv = 8,
+cv0_e_dm <- cv_arimax(y_ts = rgdp_ts, xreg_ts = doos,  h_max = 6, n_cv = 8,
                      training_length = 16,  y_order = rgdp_order_dm, 
-                     y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names,
-                     method = "ML")
+                     y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
 
 # using contemporary xregs (k = 1)
-cv1_e_r <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 1),  h_max = h_max,
-                     n_cv = 8, training_length = 16,  y_order = rgdp_order_r, 
-                     y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names,
-                     method = "ML")
+cv1_e_r <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 1),  h_max = 6, n_cv = 8,
+                   training_length = 16,  y_order = rgdp_order_r, 
+                   y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
 
-cv1_e_dm <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(doos, k = 1),  h_max = h_max,
-                      n_cv = 8, training_length = 16,  y_order = rgdp_order_dm, 
-                      y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names,
-                      method = "ML")
+cv1_e_dm <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(doos, k = 1),  h_max = 6, n_cv = 8,
+                     training_length = 16,  y_order = rgdp_order_dm, 
+                     y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
 
 # using contemporary xregs (k = 2)
-cv2_e_r <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 2),  h_max = h_max,
-                     n_cv = 8, training_length = 16,  y_order = rgdp_order_r, 
-                     y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names,
-                     method = "ML")
+cv2_e_r <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 2),  h_max = 6, n_cv = 8,
+                   training_length = 16,  y_order = rgdp_order_r, 
+                   y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
 
-cv2_e_dm <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(doos, k = 2),  h_max = h_max,
-                      n_cv = 8, training_length = 16,  y_order = rgdp_order_dm, 
-                      y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names,
-                      method = "ML")
-
-cv_rgdp_e_r <- cv_arima(y_ts = rgdp_ts, h_max = h_max, n_cv = 8,
-                     training_length = 16,  y_order = rgdp_order_r, 
-                     y_seasonal = rgdp_seasonal_r,
-                     method = "ML")
-
-cv_rgdp_e_dm <- cv_arima(y_ts = rgdp_ts, h_max = h_max, n_cv = 8,
-                        training_length = 16,  y_order = rgdp_order_dm, 
-                        y_seasonal = rgdp_seasonal_dm,
-                        method = "ML")
-
+cv2_e_dm <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(doos, k = 2),  h_max = 6, n_cv = 8,
+                     training_length = 16,  y_order = rgdp_order_dm, 
+                     y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
 toc()
 
 # make a function called rmse
 # example with weights_vec set to default
-cv0_rmse_list_r <- map(cv0_e_r, compute_rmse, h_max = h_max, n_cv = 8)
-cv1_rmse_list_r <- map(cv1_e_r, compute_rmse, h_max = h_max, n_cv = 8)
-cv2_rmse_list_r <- map(cv2_e_r, compute_rmse, h_max = h_max, n_cv = 8)
-
-cv_rdgp_rmse_r <- compute_rmse(cv_rgdp_e_r, h_max = h_max, n_cv = 8)
-cv_rdgp_rmse_dm <- compute_rmse(cv_rgdp_e_dm, h_max = h_max, n_cv = 8)
+cv0_rmse_list_r <- map(cv0_e_r, compute_rmse, h_max = 6, n_cv = 8)
+cv1_rmse_list_r <- map(cv1_e_r, compute_rmse, h_max = 6, n_cv = 8)
+cv2_rmse_list_r <- map(cv2_e_r, compute_rmse, h_max = 6, n_cv = 8)
 
 # notice the difference between these two
-cv0_rmse_wm_list_r <- map(cv0_rmse_list_r, "weighted_same_h")
-cv0_rmse_wm_vector_r <- map_dbl(cv0_rmse_list_r, "weighted_same_h")
-cv1_rmse_wm_vector_r <- map_dbl(cv1_rmse_list_r, "weighted_same_h")
-cv2_rmse_wm_vector_r <- map_dbl(cv2_rmse_list_r, "weighted_same_h")
-
-cv_rmse_rgdp_wm_vector_r <- cv_rdgp_rmse_r[["weighted_same_h"]]
-cv_rmse_rgdp_wm_vector_dm <- cv_rdgp_rmse_dm[["weighted_same_h"]]
+cv0_rmse_wm_list_r <- map(cv0_rmse_list_r, "weighted_rmse_all_horizons")
+cv0_rmse_wm_vector_r <- map_dbl(cv0_rmse_list_r, "weighted_rmse_all_horizons")
+cv1_rmse_wm_vector_r <- map_dbl(cv1_rmse_list_r, "weighted_rmse_all_horizons")
+cv2_rmse_wm_vector_r <- map_dbl(cv2_rmse_list_r, "weighted_rmse_all_horizons")
 
 all_arimax_r <- my_arimax(y_ts = rgdp_ts, xreg_ts = roos,  y_order = rgdp_order_r, 
                        y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
@@ -172,10 +148,12 @@ all_arimax_r <- my_arimax(y_ts = rgdp_ts, xreg_ts = roos,  y_order = rgdp_order_
 all_arimax_dm <- my_arimax(y_ts = rgdp_ts, xreg_ts = doos,  y_order = rgdp_order_dm, 
                         y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
 
-all_fcs_r <- forecast_xreg(all_arimax_r, roos, h = h_max, vec_of_names = monthly_names)
-all_fcs_dm <- forecast_xreg(all_arimax_dm, doos, h = h_max, vec_of_names = monthly_names)
+all_fc_arimax_r <- map2(all_arimax_r, my_forecast, h = 6, xreg =  roos[ , "emae"])
 
-toc()
+forecast(arimax_r_emae, h = 6, xreg =  roos[57:62, "emae"])
+
+arimax_r_emae <- all_arimax_r[[1]]
+
 # # example with weights_vec set to 0.2, 0.2, 0.2, 0.2, 0.1, 0.1
 # moo <- map(cv0_e_r, compute_rmse, h_max = 6, weights_vec = c(0.2, 0.2, 0.2, 0.2, 0.1, 0.1))
 # moo
