@@ -416,7 +416,7 @@ cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
       print("y_ts")
       print(y_ts)
       
-      print("x_as_y")
+      print("x_series")
       print(x_series)
       
       training_y <- subset(y_ts, 
@@ -429,6 +429,8 @@ cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
       training_x <- subset(x_series,
                            start = start_training_index_x,
                            end = end_training_index_x)
+      
+      return(training_x)
       
       print("training_x")
       print(training_x)
