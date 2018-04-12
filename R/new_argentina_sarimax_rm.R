@@ -176,16 +176,40 @@ cv2_rmse_wm_dm <- map_dbl(cv2_rmse_list_dm, "weighted_same_h")
 cv_rmse_rgdp_r <- cv_rdgp_rmse_r[["weighted_same_h"]]
 cv_rmse_rgdp_dm <- cv_rdgp_rmse_dm[["weighted_same_h"]]
 
-all_arimax_r <- my_arimax(y_ts = rgdp_ts, xreg_ts = roos,  y_order = rgdp_order_r, 
+all_arimax_r_0 <- my_arimax(y_ts = rgdp_ts, xreg_ts = roos,  y_order = rgdp_order_r, 
                        y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
+all_arimax_r_1 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 1),  y_order = rgdp_order_r, 
+                          y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
+all_arimax_r_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 2),  y_order = rgdp_order_r, 
+                          y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
 
-all_arimax_dm <- my_arimax(y_ts = rgdp_ts, xreg_ts = doos,  y_order = rgdp_order_dm, 
+
+all_arimax_dm_0 <- my_arimax(y_ts = rgdp_ts, xreg_ts = doos,  y_order = rgdp_order_dm, 
                         y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
+all_arimax_dm_1 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 1),  y_order = rgdp_order_dm, 
+                           y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
+all_arimax_dm_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 2),  y_order = rgdp_order_dm, 
+                           y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
 
-all_fcs_r <- forecast_xreg(all_arimax_r, roos, h = h_max, vec_of_names = monthly_names)
-all_fcs_dm <- forecast_xreg(all_arimax_dm, doos, h = h_max, vec_of_names = monthly_names)
+
+all_fcs_r_0 <- forecast_xreg(all_arimax_r_0, roos, h = h_max, vec_of_names = monthly_names)
+all_fcs_r_1 <- forecast_xreg(all_arimax_r_1, roos, h = h_max, vec_of_names = monthly_names)
+all_fcs_r_2 <- forecast_xreg(all_arimax_r_2, roos, h = h_max, vec_of_names = monthly_names)
+
+all_fcs_dm_0 <- forecast_xreg(all_arimax_dm_0, doos, h = h_max, vec_of_names = monthly_names)
+all_fcs_dm_1 <- forecast_xreg(all_arimax_dm_1, doos, h = h_max, vec_of_names = monthly_names)
+all_fcs_dm_2 <- forecast_xreg(all_arimax_dm_2, doos, h = h_max, vec_of_names = monthly_names)
 
 toc()
+
+all_fcs_r <- tibble(fc_0 = all_fcs_r_0, fc_1 = all_fcs_r_1, fc_2 = all_fcs_r_2, 
+                    id_fc = monthly_names) %>%
+  gather(key = "type_fc", value = "fc", -id_fc)
+
+all_fcs_dm <- tibble(fc_0 = all_fcs_dm_0, fc_1 = all_fcs_dm_1, fc_2 = all_fcs_dm_2, 
+                    id_fc = monthly_names) %>%
+  gather(key = "type_fc", value = "fc", -id_fc)
+  
 
 # # example with weights_vec set to 0.2, 0.2, 0.2, 0.2, 0.1, 0.1
 # moo <- map(cv0_e_r, compute_rmse, h_max = 6, weights_vec = c(0.2, 0.2, 0.2, 0.2, 0.1, 0.1))
@@ -211,21 +235,56 @@ ave_rmse_both_sorted <-  as_tibble(ave_rmse_012_both) %>%
   gather(key = "type", value = "rmse", -id) %>%
   arrange(rmse) 
 
-ave_rmse_012_both_ <- as_tibble(ave_rmse_012_both) %>% 
-  mutate(id = monthly_names) %>% 
-  gather(key = "type", value = "rmse", -id) %>%
-  arrange(id)
-  
 
-ave_rmse_r_tbl <- as_tibble(ave_rmse_012_r) %>% 
+ave_rmse_r_tbl_r <- as_tibble(ave_rmse_012_r) %>% 
   mutate(id = monthly_names) %>% 
   gather(key = "type", value = "rmse", -id) %>% 
-  arrange(id) %>% 
-  group_by(id) %>% 
+  cbind(all_fcs_r) %>% 
+  select(-c(id, type)) %>% 
+  arrange(id_fc) %>% 
+  group_by(id_fc) %>% 
   mutate(min = min(rmse)) %>% 
   filter(rmse == min) %>% 
   mutate(rmse_rgdp = cv_rmse_rgdp_r) %>% 
-  filter(min <= rmse_rgdp)
+  filter(min <= rmse_rgdp) %>% 
+  mutate(fc_mean = map(fc, "mean")) %>% 
+  mutate(inv_mse = 1/(rmse^2)) %>% 
+  ungroup() %>% 
+  mutate(sum_inv_mse = sum(inv_mse),
+         fc_weight = inv_mse/sum_inv_mse)
+
+fcs_and_weights_r <- ave_rmse_r_tbl %>% 
+  select(c(id_fc, type_fc, fc_weight, fc_mean)) %>% 
+  mutate(weighted_fc_means = map2(fc_weight, fc_mean, ~ .x * .y))
+
+w_fcs_r <- fcs_and_weights_r %>% select(weighted_fc_means) 
+
+final_fc_mean_r <- colSums(reduce((reduce(w_fcs_r, ts.union)), rbind))
+
+ave_rmse_r_tbl_dm <- as_tibble(ave_rmse_012_dm) %>% 
+  mutate(id = monthly_names) %>% 
+  gather(key = "type", value = "rmse", -id) %>% 
+  cbind(all_fcs_dm) %>% 
+  select(-c(id, type)) %>% 
+  arrange(id_fc) %>% 
+  group_by(id_fc) %>% 
+  mutate(min = min(rmse)) %>% 
+  filter(rmse == min) %>% 
+  mutate(rmse_rgdp = cv_rmse_rgdp_dm) %>% 
+  filter(min <= rmse_rgdp) %>% 
+  mutate(fc_mean = map(fc, "mean")) %>% 
+  mutate(inv_mse = 1/(rmse^2)) %>% 
+  ungroup() %>% 
+  mutate(sum_inv_mse = sum(inv_mse),
+         fc_weight = inv_mse/sum_inv_mse)
+
+fcs_and_weights_dm <- ave_rmse_r_tbl_dm %>% 
+  select(c(id_fc, type_fc, fc_weight, fc_mean)) %>% 
+  mutate(weighted_fc_means = map2(fc_weight, fc_mean, ~ .x * .y))
+
+w_fcs_dm <- fcs_and_weights_dm %>% select(weighted_fc_means) 
+
+final_fc_mean_dm <- colSums(reduce((reduce(w_fcs_dm, ts.union)), rbind))
 
 
 
