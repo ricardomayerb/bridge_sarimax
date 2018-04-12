@@ -159,12 +159,12 @@ cv_rdgp_rmse_dm <- compute_rmse(cv_rgdp_e_dm, h_max = h_max, n_cv = 8)
 
 # notice the difference between these two
 cv0_rmse_wm_list_r <- map(cv0_rmse_list_r, "weighted_same_h")
-cv0_rmse_wm_vector_r <- map_dbl(cv0_rmse_list_r, "weighted_same_h")
-cv1_rmse_wm_vector_r <- map_dbl(cv1_rmse_list_r, "weighted_same_h")
-cv2_rmse_wm_vector_r <- map_dbl(cv2_rmse_list_r, "weighted_same_h")
+cv0_rmse_wm_r <- map_dbl(cv0_rmse_list_r, "weighted_same_h")
+cv1_rmse_wm_r <- map_dbl(cv1_rmse_list_r, "weighted_same_h")
+cv2_rmse_wm_r <- map_dbl(cv2_rmse_list_r, "weighted_same_h")
 
-cv_rmse_rgdp_wm_vector_r <- cv_rdgp_rmse_r[["weighted_same_h"]]
-cv_rmse_rgdp_wm_vector_dm <- cv_rdgp_rmse_dm[["weighted_same_h"]]
+cv_rmse_rgdp_r <- cv_rdgp_rmse_r[["weighted_same_h"]]
+cv_rmse_rgdp_dm <- cv_rdgp_rmse_dm[["weighted_same_h"]]
 
 all_arimax_r <- my_arimax(y_ts = rgdp_ts, xreg_ts = roos,  y_order = rgdp_order_r, 
                        y_seasonal = rgdp_seasonal_r, vec_of_names = monthly_names)
@@ -179,3 +179,16 @@ toc()
 # # example with weights_vec set to 0.2, 0.2, 0.2, 0.2, 0.1, 0.1
 # moo <- map(cv0_e_r, compute_rmse, h_max = 6, weights_vec = c(0.2, 0.2, 0.2, 0.2, 0.1, 0.1))
 # moo
+
+ave_rmse_012_r <- cbind(cv0_rmse_wm_r, cv1_rmse_wm_r, cv2_rmse_wm_r)
+
+ave_rmse_r_df <- as.data.frame(ave_rmse_012_r) 
+ave_rmse_r_df[, "arima_gdp"] <- cv_rmse_rgdp_r
+ave_rmse_r_df <- rownames_to_column(ave_rmse_r_df, var = "id")
+ave_rmse_r_df
+
+
+ave_rmse_r_tbl <- as_tibble(ave_rmse_012_r) 
+ave_rmse_r_tbl[, "arima_gdp"] <- cv_rmse_rgdp_r
+ave_rmse_r_tbl[, "id"] <- monthly_names 
+ave_rmse_r_tbl
