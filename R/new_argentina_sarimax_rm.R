@@ -154,6 +154,10 @@ cv0_rmse_list_r <- map(cv0_e_r, compute_rmse, h_max = h_max, n_cv = 8)
 cv1_rmse_list_r <- map(cv1_e_r, compute_rmse, h_max = h_max, n_cv = 8)
 cv2_rmse_list_r <- map(cv2_e_r, compute_rmse, h_max = h_max, n_cv = 8)
 
+cv0_rmse_list_dm <- map(cv0_e_dm, compute_rmse, h_max = h_max, n_cv = 8)
+cv1_rmse_list_dm <- map(cv1_e_dm, compute_rmse, h_max = h_max, n_cv = 8)
+cv2_rmse_list_dm <- map(cv2_e_dm, compute_rmse, h_max = h_max, n_cv = 8)
+
 cv_rdgp_rmse_r <- compute_rmse(cv_rgdp_e_r, h_max = h_max, n_cv = 8)
 cv_rdgp_rmse_dm <- compute_rmse(cv_rgdp_e_dm, h_max = h_max, n_cv = 8)
 
@@ -162,6 +166,12 @@ cv0_rmse_wm_list_r <- map(cv0_rmse_list_r, "weighted_same_h")
 cv0_rmse_wm_r <- map_dbl(cv0_rmse_list_r, "weighted_same_h")
 cv1_rmse_wm_r <- map_dbl(cv1_rmse_list_r, "weighted_same_h")
 cv2_rmse_wm_r <- map_dbl(cv2_rmse_list_r, "weighted_same_h")
+
+cv0_rmse_wm_dm <- map_dbl(cv0_rmse_list_dm, "weighted_same_h")
+cv1_rmse_wm_dm <- map_dbl(cv1_rmse_list_dm, "weighted_same_h")
+cv2_rmse_wm_dm <- map_dbl(cv2_rmse_list_dm, "weighted_same_h")
+
+
 
 cv_rmse_rgdp_r <- cv_rdgp_rmse_r[["weighted_same_h"]]
 cv_rmse_rgdp_dm <- cv_rdgp_rmse_dm[["weighted_same_h"]]
@@ -176,19 +186,61 @@ all_fcs_r <- forecast_xreg(all_arimax_r, roos, h = h_max, vec_of_names = monthly
 all_fcs_dm <- forecast_xreg(all_arimax_dm, doos, h = h_max, vec_of_names = monthly_names)
 
 toc()
+
 # # example with weights_vec set to 0.2, 0.2, 0.2, 0.2, 0.1, 0.1
 # moo <- map(cv0_e_r, compute_rmse, h_max = 6, weights_vec = c(0.2, 0.2, 0.2, 0.2, 0.1, 0.1))
 # moo
 
 ave_rmse_012_r <- cbind(cv0_rmse_wm_r, cv1_rmse_wm_r, cv2_rmse_wm_r)
 
-ave_rmse_r_df <- as.data.frame(ave_rmse_012_r) 
-ave_rmse_r_df[, "arima_gdp"] <- cv_rmse_rgdp_r
-ave_rmse_r_df <- rownames_to_column(ave_rmse_r_df, var = "id")
-ave_rmse_r_df
+ave_rmse_012_dm <- cbind(cv0_rmse_wm_dm, cv1_rmse_wm_dm, cv2_rmse_wm_dm)
+
+ave_rmse_012_both <- cbind(cv0_rmse_wm_dm, cv1_rmse_wm_dm, cv2_rmse_wm_dm,
+                           cv0_rmse_wm_r, cv1_rmse_wm_r, cv2_rmse_wm_r)
+
+ave_rmse_012_both_tbl <- as_tibble(ave_rmse_012_both) %>% 
+  mutate(id = monthly_names) %>% 
+  gather(key = "type", value = "rmse", -id) %>%
+  arrange(id) %>% 
+  group_by(id) %>% 
+  mutate(min = min(rmse)) %>% 
+  filter(rmse == min)
+
+ave_rmse_both_sorted <-  as_tibble(ave_rmse_012_both) %>% 
+  mutate(id = monthly_names) %>% 
+  gather(key = "type", value = "rmse", -id) %>%
+  arrange(rmse) 
+
+ave_rmse_012_both_ <- as_tibble(ave_rmse_012_both) %>% 
+  mutate(id = monthly_names) %>% 
+  gather(key = "type", value = "rmse", -id) %>%
+  arrange(id)
+  
+
+ave_rmse_r_tbl <- as_tibble(ave_rmse_012_r) %>% 
+  mutate(id = monthly_names) %>% 
+  gather(key = "type", value = "rmse", -id) %>% 
+  arrange(id) %>% 
+  group_by(id) %>% 
+  mutate(min = min(rmse)) %>% 
+  filter(rmse == min) %>% 
+  mutate(rmse_rgdp = cv_rmse_rgdp_r) %>% 
+  filter(min <= rmse_rgdp)
 
 
-ave_rmse_r_tbl <- as_tibble(ave_rmse_012_r) 
-ave_rmse_r_tbl[, "arima_gdp"] <- cv_rmse_rgdp_r
-ave_rmse_r_tbl[, "id"] <- monthly_names 
-ave_rmse_r_tbl
+
+ave_rmse_dm_tbl <- as_tibble(ave_rmse_012_dm) %>% 
+  mutate(id = monthly_names) %>% 
+  gather(key = "type", value = "rmse", -id) %>% 
+  arrange(id) %>% 
+  group_by(id) %>% 
+  mutate(min = min(rmse)) %>% 
+  filter(rmse == min) %>% 
+  mutate(rmse_rgdp = cv_rmse_rgdp_dm) %>% 
+  filter(min <= rmse_rgdp)
+  
+ave_rmse_dm_tbl
+
+
+ave_rmse_012_tbl_r <- tibble( lag_0 = cv0_rmse_list_r, lag_1 = cv1_rmse_wm_r, 
+                              lag_2 = cv2_rmse_wm_r)
