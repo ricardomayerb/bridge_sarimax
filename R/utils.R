@@ -7,6 +7,167 @@ library(tictoc)
 library(lubridate)
 library(stringr)
 
+bsarimax_as_function <- function(data_path, train_span = 16, h_max = 6,
+                                 number_of_cv = 8, 
+                                 final_forecast_horizon = c(2019, 12),
+                                 outer_cv_round = 0) {
+  
+  
+  gdp_and_dates <- get_rgdp_and_dates(data_path)
+  
+  monthly_data <- get_monthly_variables(data_path = data_path)
+  monthly_ts <- make_monthly_ts(monthly_data)
+  monthly_ts  <- log(monthly_ts)
+  monthly_names <- colnames(monthly_ts)
+  
+  rgdp_ts <- ts(data = gdp_and_dates[["gdp_data"]], 
+                start = gdp_and_dates[["gdp_start"]], frequency = 4)
+  rgdp_ts <- log(rgdp_ts)
+  
+  if(outer_cv_round > 0) {
+    total_obs <- length(rgdp_ts)
+    print(total_obs)
+    
+    print("rgdp_ts")
+    print(rgdp_ts)
+    
+    outer_obs <- total_obs - outer_cv_round  + 1
+    print(outer_obs)
+    
+    cv_rgdp_ts <- ts(data = rgdp_ts[1:outer_obs], 
+                     start = gdp_and_dates[["gdp_start"]], frequency = 4)
+    
+    print("cv_rgdp_ts")
+    print(cv_rgdp_ts)
+    
+    traininig_set_rgdp <- subset(cv_rgdp_ts, 
+                                 start = outer_obs - h_max - train_span + 1,
+                                 end = outer_obs - h_max)
+    
+    print("traininig_set_rgdp")
+    print(traininig_set_rgdp)
+    
+    test_set_rgdp <- subset(cv_rgdp_ts, 
+                                 start = outer_obs - h_max + 1,
+                                 end = outer_obs)
+    
+    print("test_set_rgdp")
+    print(test_set_rgdp)
+    
+    rgdp_ts <- traininig_set_rgdp
+    
+  }
+  
+  demetra_output <- get_demetra_params(data_path)
+  
+  fit_arima_rgdp_list_dem <- fit_arimas(
+    y_ts = rgdp_ts, order_list = demetra_output[["rgdp_order_list"]],
+    this_arima_names = "rgdp")
+
+  fit_arima_monthly_list_dem <- fit_arimas(
+    y_ts = monthly_ts, order_list = demetra_output[["monthly_order_list"]],
+    this_arima_names = monthly_names)
+  
+  gdp_order_dm <- get_order_from_arima(fit_arima_rgdp_list_dem)[[1]]
+  
+  monthly_order_dm <- get_order_from_arima(fit_arima_monthly_list_dem, 
+                                           suffix = "dm",
+                                           this_arima_names = monthly_names)
+  
+  mdata_ext_dm <- extend_and_qtr(data_mts = monthly_ts, 
+                                 final_horizon_date = final_forecast_horizon , 
+                                 vec_of_names = monthly_names, 
+                                 fitted_arima_list = fit_arima_monthly_list_dem,
+                                 start_date_gdp = gdp_and_dates[["gdp_start"]])
+  
+  mdata_ext_dm_ts <- mdata_ext_dm[["series_ts"]]
+  
+  rgdp_order_dm <-  gdp_order_dm[c("p", "d", "q")]
+  rgdp_seasonal_dm <-  gdp_order_dm[c("P", "D", "Q")]
+  
+  # using contemporary xregs (k = 0)
+  cv0_e_dm <- cv_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_dm_ts,  h_max =  h_max, n_cv = number_of_cv,
+                        training_length = train_span,  y_order = rgdp_order_dm, 
+                        y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names,
+                        method = "ML")
+  
+  # using one-lag xregs (k = 1)
+  cv1_e_dm <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_dm_ts, k = 1),  h_max = h_max,
+                        n_cv = number_of_cv, training_length = train_span,  y_order = rgdp_order_dm, 
+                        y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names,
+                        method = "ML")
+  
+  # using two-lags xregs (k = 2)
+  cv2_e_dm <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_dm_ts, k = 2),  h_max = h_max,
+                        n_cv = number_of_cv, training_length = train_span,  y_order = rgdp_order_dm, 
+                        y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names,
+                        method = "ML")
+  
+  cv_rgdp_e_dm <- cv_arima(y_ts = rgdp_ts, h_max = h_max, n_cv = number_of_cv,
+                           training_length = train_span,  y_order = rgdp_order_dm, 
+                           y_seasonal = rgdp_seasonal_dm,
+                           method = "ML")
+  
+  # example with weights_vec set to default
+  cv0_rmse_list_dm <- map(cv0_e_dm, compute_rmse, h_max = h_max, n_cv = number_of_cv)
+  cv1_rmse_list_dm <- map(cv1_e_dm, compute_rmse, h_max = h_max, n_cv = number_of_cv)
+  cv2_rmse_list_dm <- map(cv2_e_dm, compute_rmse, h_max = h_max, n_cv = number_of_cv)
+  
+  cv_rdgp_rmse_dm <- compute_rmse(cv_rgdp_e_dm, h_max = h_max, n_cv = number_of_cv)
+  
+  cv0_rmse_wm_list_dm <- map(cv0_rmse_list_dm, "weighted_same_h")
+  cv0_rmse_wm_dm <- map_dbl(cv0_rmse_list_dm, "weighted_same_h")
+  cv1_rmse_wm_dm <- map_dbl(cv1_rmse_list_dm, "weighted_same_h")
+  cv2_rmse_wm_dm <- map_dbl(cv2_rmse_list_dm, "weighted_same_h")
+  
+  cv_rmse_rgdp_dm <- cv_rdgp_rmse_dm[["weighted_same_h"]]
+  
+  all_arimax_dm_0 <- my_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_dm_ts,  y_order = rgdp_order_dm, 
+                               y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
+  all_arimax_dm_1 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_dm_ts, k = 1),  y_order = rgdp_order_dm, 
+                               y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
+  all_arimax_dm_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_dm_ts, k = 2),  y_order = rgdp_order_dm, 
+                               y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
+  
+  all_fcs_dm_0 <- forecast_xreg(all_arimax_dm_0, mdata_ext_dm_ts, h = h_max, vec_of_names = monthly_names)
+  all_fcs_dm_1 <- forecast_xreg(all_arimax_dm_1, mdata_ext_dm_ts, h = h_max, vec_of_names = monthly_names)
+  all_fcs_dm_2 <- forecast_xreg(all_arimax_dm_2, mdata_ext_dm_ts, h = h_max, vec_of_names = monthly_names)
+  toc()
+  
+  all_fcs_dm <- tibble(fc_0 = all_fcs_dm_0, fc_1 = all_fcs_dm_1, fc_2 = all_fcs_dm_2, 
+                       id_fc = monthly_names) %>%
+    gather(key = "type_fc", value = "fc", -id_fc)
+  
+  ave_rmse_012_dm <- cbind(cv0_rmse_wm_dm, cv1_rmse_wm_dm, cv2_rmse_wm_dm)
+  
+  ave_rmse_r_tbl_dm <- as_tibble(ave_rmse_012_dm) %>% 
+    mutate(id = monthly_names) %>% 
+    gather(key = "type", value = "rmse", -id) %>% 
+    cbind(all_fcs_dm) %>% 
+    select(-c(id, type)) %>% 
+    arrange(id_fc) %>% 
+    group_by(id_fc) %>% 
+    mutate(min = min(rmse)) %>% 
+    filter(rmse == min) %>% 
+    mutate(rmse_rgdp = cv_rmse_rgdp_dm) %>% 
+    filter(min <= rmse_rgdp) %>% 
+    mutate(fc_mean = map(fc, "mean")) %>% 
+    mutate(inv_mse = 1/(rmse^2)) %>% 
+    ungroup() %>% 
+    mutate(sum_inv_mse = sum(inv_mse),
+           fc_weight = inv_mse/sum_inv_mse)
+  
+  fcs_and_weights_dm <- ave_rmse_r_tbl_dm %>% 
+    select(c(id_fc, type_fc, fc_weight, fc_mean)) %>% 
+    mutate(weighted_fc_means = map2(fc_weight, fc_mean, ~ .x * .y))
+  
+  w_fcs_dm <- fcs_and_weights_dm %>% select(weighted_fc_means) 
+  
+  final_fc_mean_dm <- colSums(reduce((reduce(w_fcs_dm, ts.union)), rbind))
+  
+  return(final_fc_mean_dm)
+}
+
 get_rgdp_and_dates <- function(data_path, gdp_name = "rgdp", 
                                date_name = "date") {
   
@@ -280,7 +441,8 @@ extend_and_qtr <- function(data_mts, final_horizon_date, vec_of_names,
   
   
   
-  ext_series_xts_quarterly <- apply.quarterly(ext_series_xts_monthly , mean, na.rm = TRUE)
+  ext_series_xts_quarterly <- apply.quarterly(ext_series_xts_monthly , 
+                                              mean, na.rm = TRUE)
   ext_series_xts_quarterly <- ext_series_xts_quarterly[start_gdp_str]
   
   ext_series_ts_quarterly <- tk_ts(ext_series_xts_quarterly, 
