@@ -186,9 +186,9 @@ all_arimax_r_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 2),  y_o
 
 all_arimax_dm_0 <- my_arimax(y_ts = rgdp_ts, xreg_ts = doos,  y_order = rgdp_order_dm, 
                         y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
-all_arimax_dm_1 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 1),  y_order = rgdp_order_dm, 
+all_arimax_dm_1 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(doos, k = 1),  y_order = rgdp_order_dm, 
                            y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
-all_arimax_dm_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(roos, k = 2),  y_order = rgdp_order_dm, 
+all_arimax_dm_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(doos, k = 2),  y_order = rgdp_order_dm, 
                            y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)
 
 
