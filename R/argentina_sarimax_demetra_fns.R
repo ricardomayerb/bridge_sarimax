@@ -9,12 +9,10 @@ library(tictoc)
 library(lubridate)
 
 final_forecast_horizon <- c(2019, 12)
-h_max = 3 # last rgdp data is 2017 Q4
+h_max = 8 # last rgdp data is 2017 Q4
 number_of_cv = 8
 train_span = 16
 data_path <- "./data/excel_data/Argentina.xlsx"
-
-
 
 tic()
 myres <- bsarimax_as_function(data_path = data_path, number_of_cv = number_of_cv,
@@ -23,7 +21,13 @@ myres <- bsarimax_as_function(data_path = data_path, number_of_cv = number_of_cv
                               outer_cv_round = 0)
 toc()
 
+fc_loglevel = myres[["fc"]]
+rgdp_loglevel = myres[["rgdp"]]
+rgdp_and_loglevel = myres[["rgdp_and_fc"]]
 
+rgdp_and_level <- exp(rgdp_and_loglevel)
+crec_yoy <- 100 *  diff(rgdp_and_level, lag = 4)/lag.xts(rgdp_and_level, k = 4)
+crec_yoy
 
 # outer_cv_bsarimax <- function(number_of_outer_cv, data_path, train_span = 16,
 #                               h_max = 6, number_of_cv = 8, 
