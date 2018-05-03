@@ -12,7 +12,7 @@ tic()
 # preliminaries -----------------------------------------------------------
 
 final_forecast_horizon <- c(2019, 12)
-h_max = 3 # last rgdp data is 2017 Q4
+h_max = 6 # last rgdp data is 2017 Q4
 number_of_cv = 8
 train_span = 16
 
@@ -24,6 +24,7 @@ monthly_data <- get_monthly_variables(data_path = data_path)
 
 monthly_ts <- make_monthly_ts(monthly_data)
 monthly_ts  <- log(monthly_ts)
+full_monthly_ts  <- monthly_ts
 
 monthly_names <- colnames(monthly_ts)
 
@@ -31,17 +32,54 @@ rgdp_ts <- ts(data = gdp_and_dates[["gdp_data"]],
               start = gdp_and_dates[["gdp_start"]], frequency = 4)
 rgdp_ts <- log(rgdp_ts)
 
-foo <- monthly_ts[,1]
-moo <- diff(diff(cumsum(is.na(foo))))
-ind_last_obs <- which(moo == 1) + 1
 
+foo <- monthly_ts[, 1]
 
-retro <- 2
-new_foo <- foo
-ts.union(foo, new_foo)
-new_foo[(ind_last_obs-retro+1):ind_last_obs] <- NA
+cutback_ts <- function(single_ts, nrows_to_cut) {
+  
+  if (nrows_to_cut > 0) {
+    
+    if (  is.na(last(single_ts))  ) {
+      ddc_ts <- diff(diff(cumsum(is.na(single_ts))))
+      ind_last_obs <- which(ddc_ts == 1) + 1
+      new_ts <- single_ts
+      new_ts[(ind_last_obs - nrows_to_cut + 1):ind_last_obs] <- NA
+    } else {
+      new_ts <- single_ts
+      new_ts[(length(single_ts) - nrows_to_cut + 1):length(single_ts)] <- NA
+    }
+    return(new_ts)
+    } else{
+    return(single_ts)
+  }
+  
+}
 
-ts.union(foo, new_foo)
+moo <- cutback_ts(single_ts = foo, nrows_to_cut = 2)
+ts.union(foo, moo)
+
+rgdp_ts_cv <- cutback_ts(single_ts = rgdp_ts, nrows_to_cut = 3)
+ts.union(rgdp_ts, rgdp_ts_cv)
+
+rgdp_ts_onena <- cutback_ts(single_ts = rgdp_ts, nrows_to_cut = 1)
+ts.union(rgdp_ts, rgdp_ts_onena)
+
+rgdp_ts_twona <- cutback_ts(single_ts = rgdp_ts_onena, nrows_to_cut = 1)
+ts.union(rgdp_ts_onena, rgdp_ts_twona)
+
+rgdp_ts_fourna <- cutback_ts(single_ts = rgdp_ts_twona, nrows_to_cut = 4)
+ts.union(rgdp_ts_twona, rgdp_ts_fourna)
+
+# funciona!!! pero debe volver a ser ts
+monthly_data_cv <- apply(monthly_ts, MARGIN = 2, FUN = cutback_ts, nrows_to_cut = 2)
+start_time_vec_monthly <- min(time(monthly_ts))
+start_year_vec_monthly <- floor(start_time_vec_monthly)
+start_quarter_vec_monthly <- 4*(start_time_vec_monthly - start_year_vec_monthly + 0.25)
+
+monthly_ts_cv <- ts(monthly_data_cv, 
+                    start = c(start_year_vec_monthly, 
+                              start_quarter_vec_monthly),
+                    frequency = 12)
 
 demetra_output <- get_demetra_params(data_path)
 
@@ -106,6 +144,17 @@ cv_rgdp_e_dm <- cv_arima(y_ts = rgdp_ts, h_max = h_max, n_cv = number_of_cv,
                         y_seasonal = rgdp_seasonal_dm,
                         method = "ML")
 
+cv0_e_dm_yoy <- cv0_e_dm[["cv_yoy_errors_all_pairs_yx"]]
+cv1_e_dm_yoy <- cv1_e_dm[["cv_yoy_errors_all_pairs_yx"]]
+cv2_e_dm_yoy <- cv2_e_dm[["cv_yoy_errors_all_pairs_yx"]]
+
+cv0_e_dm <- cv0_e_dm[["cv_errors_all_pairs_yx"]]
+cv1_e_dm <- cv1_e_dm[["cv_errors_all_pairs_yx"]]
+cv2_e_dm <- cv2_e_dm[["cv_errors_all_pairs_yx"]]
+
+cv_rgdp_e_dm_yoy <- cv_rgdp_e_dm[["cv_yoy_errors"]]
+cv_rgdp_e_dm <- cv_rgdp_e_dm[["cv_errors"]]
+
 toc()
 
 # example with weights_vec set to default
@@ -113,14 +162,25 @@ cv0_rmse_list_dm <- map(cv0_e_dm, compute_rmse, h_max = h_max, n_cv = number_of_
 cv1_rmse_list_dm <- map(cv1_e_dm, compute_rmse, h_max = h_max, n_cv = number_of_cv)
 cv2_rmse_list_dm <- map(cv2_e_dm, compute_rmse, h_max = h_max, n_cv = number_of_cv)
 
+cv0_rmse_list_dm_yoy <- map(cv0_e_dm_yoy, compute_rmse, h_max = h_max, n_cv = number_of_cv)
+cv1_rmse_list_dm_yoy <- map(cv1_e_dm_yoy, compute_rmse, h_max = h_max, n_cv = number_of_cv)
+cv2_rmse_list_dm_yoy <- map(cv2_e_dm_yoy, compute_rmse, h_max = h_max, n_cv = number_of_cv)
+
 cv_rdgp_rmse_dm <- compute_rmse(cv_rgdp_e_dm, h_max = h_max, n_cv = number_of_cv)
+cv_rdgp_rmse_dm_yoy <- compute_rmse(cv_rgdp_e_dm_yoy, h_max = h_max, n_cv = number_of_cv)
 
 cv0_rmse_wm_list_dm <- map(cv0_rmse_list_dm, "weighted_same_h")
 cv0_rmse_wm_dm <- map_dbl(cv0_rmse_list_dm, "weighted_same_h")
 cv1_rmse_wm_dm <- map_dbl(cv1_rmse_list_dm, "weighted_same_h")
 cv2_rmse_wm_dm <- map_dbl(cv2_rmse_list_dm, "weighted_same_h")
 
+cv0_rmse_wm_dm_yoy <- map_dbl(cv0_rmse_list_dm_yoy, "weighted_same_h")
+cv1_rmse_wm_dm_yoy <- map_dbl(cv1_rmse_list_dm_yoy, "weighted_same_h")
+cv2_rmse_wm_dm_yoy <- map_dbl(cv2_rmse_list_dm_yoy, "weighted_same_h")
+
 cv_rmse_rgdp_dm <- cv_rdgp_rmse_dm[["weighted_same_h"]]
+cv_rmse_rgdp_dm_yoy <- cv_rdgp_rmse_dm_yoy[["weighted_same_h"]]
+
 
 all_arimax_dm_0 <- my_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_dm_ts,  y_order = rgdp_order_dm, 
                         y_seasonal = rgdp_seasonal_dm, vec_of_names = monthly_names)

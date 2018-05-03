@@ -541,8 +541,8 @@ cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
   
   number_of_xregs <- ncol(as.matrix(xreg_ts))
   cv_errors_all_pairs_yx <- list_along(seq.int(1, number_of_xregs)) 
-  
-  
+  cv_yoy_errors_all_pairs_yx <- list_along(seq.int(1, number_of_xregs)) 
+
   for (x in 1:number_of_xregs) {
     
     if (is.null(ncol(xreg_as_y))) {
@@ -554,6 +554,8 @@ cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
     n_x <- length(x_series)
     
     cv_errors_this_x <- list_along(1:n_cv)
+    cv_yoy_errors_this_x  <- list_along(1:n_cv)
+    
     
     for (i in seq_along(1:n_cv)) {
       
@@ -592,19 +594,42 @@ cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
                            method = method)
       
       this_fc <- forecast(this_arimax, h = h_max, xreg = test_x)
-
+      
+      train_rgdp_and_fc <- c(training_y, this_fc$mean)
+      train_rgdp_and_fc <- ts(data = train_rgdp_and_fc,
+                              frequency = 4,
+                              start = stats::start(training_y))
+      train_rgdp_and_fc_yoy <- diff(train_rgdp_and_fc, lag = 4)
+      len_tf_yoy <- length(train_rgdp_and_fc_yoy)
+      fc_rgdp_yoy <- train_rgdp_and_fc_yoy[(len_tf_yoy - h_max + 1):len_tf_yoy]
+      train_and_test_yoy <- diff(c(training_y, test_y), lag = 4)
+      len_tt_yoy <- length(train_and_test_yoy)
+      test_y_yoy <- train_and_test_yoy[(len_tt_yoy - h_max + 1):len_tt_yoy]
+      fc_error_of_yoy <- test_y_yoy - fc_rgdp_yoy
+      cv_yoy_errors_this_x[[i]] <- fc_error_of_yoy
+      
       fc_error <- test_y - this_fc$mean
-
       cv_errors_this_x[[i]] <- fc_error
       
     }
     
+    # print("cv_yoy_errors_this_x")
+    # print(cv_yoy_errors_this_x)
+ 
     cv_errors_all_pairs_yx[[x]] <- cv_errors_this_x
+    cv_yoy_errors_all_pairs_yx[[x]] <- cv_yoy_errors_this_x
   }
   
   cv_errors_all_pairs_yx <- map(cv_errors_all_pairs_yx, reduce, rbind)
   names(cv_errors_all_pairs_yx) <- vec_of_names
-  return(cv_errors_all_pairs_yx)
+  
+  
+  cv_yoy_errors_all_pairs_yx <- map(cv_yoy_errors_all_pairs_yx, reduce, rbind)
+  names(cv_yoy_errors_all_pairs_yx) <- vec_of_names
+
+  
+  return(list(cv_errors_all_pairs_yx = cv_errors_all_pairs_yx,
+         cv_yoy_errors_all_pairs_yx = cv_yoy_errors_all_pairs_yx))
 }
 
 
@@ -628,6 +653,7 @@ cv_arima <- function(y_ts,  h_max, n_cv, training_length,
   n <- length(y_ts)
   
   cv_errors <- list_along(1:n_cv)
+  cv_yoy_errors <- list_along(1:n_cv)
   
   for (i in seq_along(1:n_cv)) {
       
@@ -650,6 +676,20 @@ cv_arima <- function(y_ts,  h_max, n_cv, training_length,
                         method = method)
       
     this_fc <- forecast(this_arima, h = h_max)
+    
+    train_rgdp_and_fc <- c(training_y, this_fc$mean)
+    train_rgdp_and_fc <- ts(data = train_rgdp_and_fc,
+                            frequency = 4,
+                            start = stats::start(training_y))
+    train_rgdp_and_fc_yoy <- diff(train_rgdp_and_fc, lag = 4)
+    len_tf_yoy <- length(train_rgdp_and_fc_yoy)
+    fc_rgdp_yoy <- train_rgdp_and_fc_yoy[(len_tf_yoy - h_max + 1):len_tf_yoy]
+    train_and_test_yoy <- diff(c(training_y, test_y), lag = 4)
+    len_tt_yoy <- length(train_and_test_yoy)
+    test_y_yoy <- train_and_test_yoy[(len_tt_yoy - h_max + 1):len_tt_yoy]
+    fc_error_of_yoy <- test_y_yoy - fc_rgdp_yoy
+    cv_yoy_errors[[i]] <- fc_error_of_yoy
+    
       
     fc_error <- test_y - this_fc$mean
       
@@ -658,8 +698,9 @@ cv_arima <- function(y_ts,  h_max, n_cv, training_length,
   }
   
   cv_errors <- reduce(cv_errors, rbind)
+  cv_yoy_errors <- reduce(cv_yoy_errors, rbind)
   
-  return(cv_errors)
+  return(list(cv_errors = cv_errors, cv_yoy_errors = cv_yoy_errors) )
   
 }
   
