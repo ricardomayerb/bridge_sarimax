@@ -12,7 +12,7 @@ tic()
 # preliminaries -----------------------------------------------------------
 
 final_forecast_horizon <- c(2019, 12)
-h_max = 6 # last rgdp data is 2017 Q4
+h_max = 8 # last rgdp data is 2017 Q4
 number_of_cv = 8
 train_span = 16
 
@@ -53,6 +53,10 @@ fit_arima_rgdp_list_dem <- fit_arimas(
   this_arima_names = "rgdp")
 toc()
 
+rgdp_uncond_fc <- forecast(fit_arima_rgdp_list_dem[["rgdp"]], h = h_max)
+rgdp_uncond_fc_mean <- rgdp_uncond_fc$mean
+
+
 tic()
 fit_arima_monthly_list_dem <- fit_arimas(
   y_ts = monthly_ts, order_list = demetra_output[["monthly_order_list"]],
@@ -74,6 +78,7 @@ mdata_ext <- extend_and_qtr(data_mts = monthly_ts,
 
 doox <- mdata_ext[["series_xts"]]
 mdata_ext_ts <- mdata_ext[["series_ts"]]
+yoy_mdata_ext_ts <- diff(mdata_ext_ts, lag = 4)
 
 my_emae <- mdata_ext_ts[, "emae"]
 
@@ -133,17 +138,40 @@ cv2_rmse_list_yoy <- map(cv2_e_yoy, compute_rmse, h_max = h_max, n_cv = number_o
 cv_rdgp_rmse <- compute_rmse(cv_rgdp_e, h_max = h_max, n_cv = number_of_cv)
 cv_rdgp_rmse_yoy <- compute_rmse(cv_rgdp_e_yoy, h_max = h_max, n_cv = number_of_cv)
 
-cv0_rmse_wm_list <- map(cv0_rmse_list, "weighted_same_h")
-cv0_rmse_wm <- map_dbl(cv0_rmse_list, "weighted_same_h")
-cv1_rmse_wm <- map_dbl(cv1_rmse_list, "weighted_same_h")
-cv2_rmse_wm <- map_dbl(cv2_rmse_list, "weighted_same_h")
+cv0_rmse_each_h <- map(cv0_rmse_list, "same_h_rmse") %>% reduce(., rbind) %>% 
+  mutate(variable = monthly_names, lag = 0)
+cv1_rmse_each_h <- map(cv1_rmse_list, "same_h_rmse") %>% reduce(., rbind) %>% 
+  mutate(variable = monthly_names, lag = 1)
+cv2_rmse_each_h <- map(cv2_rmse_list, "same_h_rmse") %>% reduce(., rbind) %>% 
+  mutate(variable = monthly_names, lag = 2)
+cv_rmse_each_h_rgdp <- cv_rdgp_rmse[["same_h_rmse"]] %>% 
+  mutate(variable = "rgdp", lag = 0)
 
-cv0_rmse_wm_yoy <- map_dbl(cv0_rmse_list_yoy, "weighted_same_h")
-cv1_rmse_wm_yoy <- map_dbl(cv1_rmse_list_yoy, "weighted_same_h")
-cv2_rmse_wm_yoy <- map_dbl(cv2_rmse_list_yoy, "weighted_same_h")
+cv_all_x_rmse_each_h <- rbind(cv0_rmse_each_h,
+                            cv1_rmse_each_h, cv2_rmse_each_h)
 
-cv_rmse_rgdp <- cv_rdgp_rmse[["weighted_same_h"]]
-cv_rmse_rgdp_yoy <- cv_rdgp_rmse_yoy[["weighted_same_h"]]
+cv0_rmse_each_h_yoy <- map(cv0_rmse_list_yoy, "same_h_rmse") %>% reduce(., rbind) %>% 
+  mutate(variable = monthly_names, lag = 0)
+cv1_rmse_each_h_yoy <- map(cv1_rmse_list_yoy, "same_h_rmse") %>% reduce(., rbind) %>% 
+  mutate(variable = monthly_names, lag = 1)
+cv2_rmse_each_h_yoy<- map(cv2_rmse_list_yoy, "same_h_rmse") %>% reduce(., rbind) %>% 
+  mutate(variable = monthly_names, lag = 2)
+cv_rmse_each_h_rgdp_yoy <- cv_rdgp_rmse_yoy[["same_h_rmse"]] %>% 
+  mutate(variable = "rgdp", lag = 0)
+
+
+cv_all_x_rmse_each_h_yoy <- rbind(cv0_rmse_each_h_yoy,
+                            cv1_rmse_each_h_yoy, cv2_rmse_each_h_yoy)
+
+
+
+
+foo <- get_fc_weights_one_h(mat_cv_rmses_from_x = cv_all_x_rmse_each_h
+                      , vec_cv_rmse_from_rgdp = cv_rmse_each_h_rgdp, pos = 6)
+
+foo_yoy <- get_fc_weights_one_h(mat_cv_rmses_from_x = cv_all_x_rmse_each_h_yoy
+                            , vec_cv_rmse_from_rgdp = cv_rmse_each_h_rgdp_yoy,
+                            pos = 6)
 
 
 all_arimax_0 <- my_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  y_order = rgdp_order, 
@@ -153,103 +181,120 @@ all_arimax_1 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 1)
 all_arimax_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 2),  y_order = rgdp_order, 
                            y_seasonal = rgdp_seasonal, vec_of_names = monthly_names, s4xreg = TRUE)
 
-all_fcs_0 <- forecast_xreg(all_arimax_0, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
-all_fcs_1 <- forecast_xreg(all_arimax_1, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
-all_fcs_2 <- forecast_xreg(all_arimax_2, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+# all_fcs_0 <- forecast_xreg(all_arimax_0, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+# all_fcs_1 <- forecast_xreg(all_arimax_1, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+# all_fcs_2 <- forecast_xreg(all_arimax_2, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+
+all_fcs_0 <- forecast_xreg(all_arimax_0, yoy_mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+all_fcs_1 <- forecast_xreg(all_arimax_1, yoy_mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+all_fcs_2 <- forecast_xreg(all_arimax_2, yoy_mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+
 toc()
 
 all_fcs <- tibble(fc_0 = all_fcs_0, fc_1 = all_fcs_1, fc_2 = all_fcs_2, 
                     id_fc = monthly_names) %>%
-  gather(key = "type_fc", value = "fc", -id_fc)
+  gather(key = "type_fc", value = "fc", -id_fc) %>% 
+  mutate(lag = as.integer(str_remove(type_fc, "fc_")),
+         raw_rgdp_fc = map(fc, "mean"))
 
-all_fcs_yoy <- tibble(fc_0 = all_fcs_0, fc_1 = all_fcs_1, fc_2 = all_fcs_2, 
-                     id_fc = monthly_names) %>%
-  gather(key = "type_fc", value = "fc", -id_fc)  %>% 
-  mutate(fc_rgdp_mean = map(fc, "mean"),
-         rgdp_data = map(fc, "x"),
-         rgdp_and_fc_level = map2(rgdp_data, fc_rgdp_mean,   ~ ts(c(.x,.y), frequency = 4, 
-                                       start = stats::start(.x))
-                                  ),
-         yoy_rgdp_and_fc_level = map(rgdp_and_fc_level, diff, 4),
-         yoy_fc_rgdp_mean = map2(yoy_rgdp_and_fc_level, fc_rgdp_mean,
-                                 ~ window(.x, start = stats::start(.y))
-                                 )
-  )
+mat_of_raw_fcs <- reduce(all_fcs$raw_rgdp_fc, rbind)
+
+
+weigthed_fcs <- get_weighted_fcs(raw_fcs = mat_of_raw_fcs,
+                        mat_cv_rmses_from_x = cv_all_x_rmse_each_h,
+                        vec_cv_rmse_from_rgdp = cv_rmse_each_h_rgdp)
+
+weigthed_fcs[ is.nan(weigthed_fcs)] <- rgdp_uncond_fc_mean[ is.nan(weigthed_fcs)]
+
+
+fcs_using_yoy_weights <- get_weighted_fcs(raw_fcs = mat_of_raw_fcs,
+                                 mat_cv_rmses_from_x = cv_all_x_rmse_each_h_yoy,
+                                 vec_cv_rmse_from_rgdp = cv_rmse_each_h_rgdp_yoy)
+
+fcs_using_yoy_weights[ is.nan(fcs_using_yoy_weights)] <- rgdp_uncond_fc_mean[ is.nan(fcs_using_yoy_weights)]
+
 
 # # example with weights_vec set to 0.2, 0.2, 0.2, 0.2, 0.1, 0.1
 # moo <- map(cv0_e_r, compute_rmse, h_max = 6, weights_vec = c(0.2, 0.2, 0.2, 0.2, 0.1, 0.1))
 # moo
 
-ave_rmse_012 <- cbind(cv0_rmse_wm, cv1_rmse_wm, cv2_rmse_wm)
-ave_rmse_012_yoy <- cbind(cv0_rmse_wm_yoy, cv1_rmse_wm_yoy,
-                             cv2_rmse_wm_yoy)
 
-ave_rmse_r_tbl <- as_tibble(ave_rmse_012) %>% 
-  mutate(id = monthly_names) %>% 
-  gather(key = "type", value = "rmse", -id) %>% 
-  cbind(all_fcs) %>% 
-  select(-c(id, type)) %>% 
-  arrange(id_fc) %>% 
-  group_by(id_fc) %>% 
-  mutate(min = min(rmse)) %>% 
-  filter(rmse == min) %>% 
-  mutate(rmse_rgdp = cv_rmse_rgdp) %>% 
-  filter(min <= rmse_rgdp) %>% 
-  mutate(fc_mean = map(fc, "mean")) %>% 
-  mutate(inv_mse = 1/(rmse^2)) %>% 
-  ungroup() %>% 
-  mutate(sum_inv_mse = sum(inv_mse),
-         fc_weight = inv_mse/sum_inv_mse)
+each_h_rmse_012 <- cbind(reduce(cv0_rmse_each_h, rbind),
+                         reduce(cv1_rmse_each_h, rbind),
+                         reduce(cv2_rmse_each_h, rbind)
+)
 
-ave_rmse_r_tbl_yoy <- as_tibble(ave_rmse_012_yoy) %>% 
-  mutate(id = monthly_names) %>% 
-  gather(key = "type", value = "rmse", -id) %>% 
-  cbind(all_fcs_yoy) %>% 
-  select(-c(id, type)) %>% 
-  arrange(id_fc) %>% 
-  group_by(id_fc) %>% 
-  mutate(min = min(rmse)) %>% 
-  filter(rmse == min) %>% 
-  mutate(rmse_rgdp_yoy = cv_rmse_rgdp_yoy) %>% 
-  filter(min <= rmse_rgdp_yoy) %>%
-  mutate(inv_mse = 1/(rmse^2)) %>% 
-  ungroup() %>% 
-  mutate(sum_inv_mse = sum(inv_mse),
-         fc_weight = inv_mse/sum_inv_mse)
 
-fcs_and_weights <- ave_rmse_r_tbl %>% 
-  select(c(id_fc, type_fc, fc_weight, fc_mean)) %>% 
-  mutate(weighted_fc_means = map2(fc_weight, fc_mean, ~ .x * .y))
 
-fcs_and_weights_yoy <- ave_rmse_r_tbl_yoy %>% 
-  select(c(id_fc, type_fc, fc_weight, yoy_fc_rgdp_mean)) %>% 
-  mutate(weighted_fc_means = map2(fc_weight, yoy_fc_rgdp_mean, ~ .x * .y))
-
-w_fcs <- fcs_and_weights %>% select(weighted_fc_means) 
-w_fcs_yoy <- fcs_and_weights_yoy %>% select(weighted_fc_means) 
-
-final_fc_mean <- colSums(reduce((reduce(w_fcs, ts.union)), rbind))
-final_fc_mean_yoy <- colSums(reduce((reduce(w_fcs_yoy, ts.union)), rbind))
-
-final_rgdp_and_fc <- ts(c(rgdp_ts, final_fc_mean), frequency = 4,
-                              start = stats::start(rgdp_ts))
-
-direct_final_rgdp_and_fc_yoy <- diff(final_rgdp_and_fc, lag = 4)
-direct_final_fc_yoy <- subset(direct_final_rgdp_and_fc_yoy,
-                              start = length(direct_final_rgdp_and_fc_yoy) - h_max + 1)
-
-# ave_rmse_dm_tbl <- as_tibble(ave_rmse_012_dm) %>% 
+# ave_rmse_r_tbl <- as_tibble(ave_rmse_012) %>% 
 #   mutate(id = monthly_names) %>% 
 #   gather(key = "type", value = "rmse", -id) %>% 
-#   arrange(id) %>% 
-#   group_by(id) %>% 
+#   cbind(all_fcs) %>% 
+#   select(-c(id, type)) %>% 
+#   arrange(id_fc) %>% 
+#   group_by(id_fc) %>% 
 #   mutate(min = min(rmse)) %>% 
 #   filter(rmse == min) %>% 
-#   mutate(rmse_rgdp = cv_rmse_rgdp_dm) %>% 
-#   filter(min <= rmse_rgdp)
-#   
-# ave_rmse_dm_tbl
+#   mutate(rmse_rgdp = cv_rmse_rgdp) %>% 
+#   filter(min <= rmse_rgdp) %>% 
+#   mutate(fc_mean = map(fc, "mean")) %>% 
+#   mutate(inv_mse = 1/(rmse^2)) %>% 
+#   ungroup() %>% 
+#   mutate(sum_inv_mse = sum(inv_mse),
+#          fc_weight = inv_mse/sum_inv_mse)
 # 
-# ave_rmse_012_tbl_dm <- tibble( lag_0 = cv0_rmse_list_dm, lag_1 = cv1_rmse_wm_dm,
-#                                lag_2 = cv2_rmse_wm_dm)
-
+# ave_rmse_r_tbl_yoy <- as_tibble(ave_rmse_012_yoy) %>% 
+#   mutate(id = monthly_names) %>% 
+#   gather(key = "type", value = "rmse", -id) %>% 
+#   cbind(all_fcs_yoy) %>% 
+#   select(-c(id, type)) %>% 
+#   arrange(id_fc) %>% 
+#   group_by(id_fc) %>% 
+#   mutate(min = min(rmse)) %>% 
+#   filter(rmse == min) %>% 
+#   mutate(rmse_rgdp_yoy = cv_rmse_rgdp_yoy) %>% 
+#   filter(min <= rmse_rgdp_yoy) %>%
+#   mutate(inv_mse = 1/(rmse^2)) %>% 
+#   ungroup() %>% 
+#   mutate(sum_inv_mse = sum(inv_mse),
+#          fc_weight = inv_mse/sum_inv_mse)
+# 
+# fcs_and_weights <- ave_rmse_r_tbl %>% 
+#   select(c(id_fc, type_fc, fc_weight, fc_mean)) %>% 
+#   mutate(weighted_fc_means = map2(fc_weight, fc_mean, ~ .x * .y))
+# 
+# fcs_and_weights_yoy <- ave_rmse_r_tbl_yoy %>% 
+#   select(c(id_fc, type_fc, fc_weight, yoy_fc_rgdp_mean)) %>% 
+#   mutate(weighted_fc_means = map2(fc_weight, yoy_fc_rgdp_mean, ~ .x * .y))
+# 
+# w_fcs <- fcs_and_weights %>% select(weighted_fc_means) 
+# w_fcs_yoy <- fcs_and_weights_yoy %>% select(weighted_fc_means) 
+# 
+# final_fc_mean <- colSums(reduce((reduce(w_fcs, ts.union)), rbind))
+# final_fc_mean_yoy <- colSums(reduce((reduce(w_fcs_yoy, ts.union)), rbind))
+# 
+# final_rgdp_and_fc <- ts(c(rgdp_ts, final_fc_mean), frequency = 4,
+#                               start = stats::start(rgdp_ts))
+# 
+# expo_final_rgdp_and_fc <- exp(final_rgdp_and_fc)
+# 
+# yoy_expo_final_rgdp_and_fc <- diff(expo_final_rgdp_and_fc, lag = 4)/lag.xts(expo_final_rgdp_and_fc, k = 4)
+# 
+# 
+# direct_final_rgdp_and_fc_yoy <- diff(final_rgdp_and_fc, lag = 4)
+# direct_final_fc_yoy <- subset(direct_final_rgdp_and_fc_yoy,
+#                               start = length(direct_final_rgdp_and_fc_yoy) - h_max + 1)
+# 
+# 
+# 
+# m_arg <- read_excel("data/Argentina_m_analysis_rgdp.xlsx")
+# 
+# m_all_rmse <- m_arg[, c("rmse1", "rmse2", "rmse3", "rmse4", "rmse5", "rmse6", "rmse7", "rmse8")]
+# 
+# m_all_rmse$mean_rmse <- rowMeans(m_all_rmse)
+# 
+# m_all_rmse$cond_exo <- m_arg[ , "cond_exo"]
+# 
+# m_all_rmse <- arrange(m_all_rmse, rmse1)
+# 
+# 

@@ -85,10 +85,11 @@ bsarimax_as_function <- function(data_path, train_span = 16, h_max = 6,
                               fitted_arima_list = fit_arima_monthly_list_dem,
                               start_date_gdp = gdp_and_dates[["gdp_start"]])
   
-  doox <- mdata_ext[["series_xts"]]
+  # doox <- mdata_ext[["series_xts"]]
   mdata_ext_ts <- mdata_ext[["series_ts"]]
+  yoy_mdata_ext_ts <- diff(mdata_ext_ts, lag = 4)
   
-  my_emae <- mdata_ext_ts[, "emae"]
+  # my_emae <- mdata_ext_ts[, "emae"]
   
   rgdp_order <-  gdp_order[c("p", "d", "q")]
   rgdp_seasonal <-  gdp_order[c("P", "D", "Q")]
@@ -168,9 +169,9 @@ bsarimax_as_function <- function(data_path, train_span = 16, h_max = 6,
   all_arimax_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 2),  y_order = rgdp_order, 
                             y_seasonal = rgdp_seasonal, vec_of_names = monthly_names, s4xreg = TRUE)
   
-  all_fcs_0 <- forecast_xreg(all_arimax_0, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
-  all_fcs_1 <- forecast_xreg(all_arimax_1, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
-  all_fcs_2 <- forecast_xreg(all_arimax_2, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+  all_fcs_0 <- forecast_xreg(all_arimax_0, yoy_mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+  all_fcs_1 <- forecast_xreg(all_arimax_1, yoy_mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+  all_fcs_2 <- forecast_xreg(all_arimax_2, yoy_mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
   toc()
   
   all_fcs <- tibble(fc_0 = all_fcs_0, fc_1 = all_fcs_1, fc_2 = all_fcs_2, 
@@ -249,13 +250,18 @@ bsarimax_as_function <- function(data_path, train_span = 16, h_max = 6,
   final_rgdp_and_fc <- ts(c(rgdp_ts, final_fc_mean), frequency = 4,
                           start = stats::start(rgdp_ts))
   
+  expo_final_rgdp_and_fc <- exp(final_rgdp_and_fc)
+  
+  yoy_expo_final_rgdp_and_fc <- diff(expo_final_rgdp_and_fc, lag = 4)/lag.xts(expo_final_rgdp_and_fc, k = 4)
+  
   direct_final_rgdp_and_fc_yoy <- diff(final_rgdp_and_fc, lag = 4)
   direct_final_fc_yoy <- subset(direct_final_rgdp_and_fc_yoy,
                                 start = length(direct_final_rgdp_and_fc_yoy) - h_max + 1)
   
   
   return(list(fc = final_fc_mean, rgdp = rgdp_ts, 
-              rgdp_and_fc = final_rgdp_and_fc))
+              rgdp_and_fc = final_rgdp_and_fc,
+              fc_yoy_from_exp = yoy_expo_final_rgdp_and_fc))
 }
 
 get_rgdp_and_dates <- function(data_path, gdp_name = "rgdp", 
@@ -892,3 +898,79 @@ forecast_xreg <- function(arimax_list, xreg_mts, h, vec_of_names = NULL) {
   return(fc_list)
   
 }
+
+
+get_fc_weights_one_h <- function(mat_cv_rmses_from_x, vec_cv_rmse_from_rgdp, pos) {
+  
+  this_mat <- mat_cv_rmses_from_x
+  this_vec <- vec_cv_rmse_from_rgdp
+  
+  this_mat <- this_mat %>% 
+    filter(variable != "rgdp" )
+  
+  this_mat_num <- this_mat[, 1:h_max]
+  this_vec_num <- this_vec[1, 1:h_max]
+  
+  # this_mat_num[3,] <= this_vec_num
+  
+  is_as_good_as_rgdp <- t(apply(this_mat_num, 1 , function(x) x <= this_vec_num))
+  
+  mean_val <- rowMeans(this_mat_num)
+  
+  one_vec <- cbind(this_mat[, pos] , is_as_good_as_rgdp[ ,pos], mean_val, this_mat[,c("variable", "lag")] ) 
+  
+  vars_and_names_no_rgdp <- this_mat[,c("variable", "lag")] %>% 
+    filter(variable != "rgdp" )
+  
+  names(one_vec)[1] <- "this_h" 
+  names(one_vec)[2] <- "is_as_good_as_rgdp"
+  
+  one_vec_filtered <- one_vec %>% arrange(variable, lag) %>% 
+    group_by(variable) %>% 
+    mutate(group_min = min(mean_val)) %>% 
+    ungroup() %>% 
+    filter(mean_val == group_min) %>% 
+    mutate(filtered_rmse = ifelse(is_as_good_as_rgdp, this_h, NA),
+           filtered_mse = filtered_rmse^2,
+           inv_filtered_mse = 1/filtered_mse,
+           sum_inv_filtered_mse = sum(inv_filtered_mse, na.rm = TRUE),
+           fc_weight = ifelse(!is.na(filtered_rmse), inv_filtered_mse/ sum_inv_filtered_mse, NA)
+    )
+  
+  names(one_vec_filtered)[1] <- paste0("h_", 1)
+  # 
+  # cv_all_weights <- map2(cv_all_rmse_each_h, cv_rmse_each_h_rgdp, function(x) x[,] <= cv_rdgp_rmse)
+  
+  full_var_lag_vec_weights <- left_join(vars_and_names_no_rgdp, one_vec_filtered, by = c("variable", "lag")) %>% 
+    mutate(fc_weight = ifelse(is.na(fc_weight), 0, fc_weight)) %>% 
+    dplyr::select(variable, lag, fc_weight)
+  
+  full_vec_weights <- full_var_lag_vec_weights$fc_weight
+  
+  return(full_var_lag_vec_weights)
+  
+}
+
+get_weighted_fcs <- function(raw_fcs, mat_cv_rmses_from_x, vec_cv_rmse_from_rgdp) {
+  
+  n_h <- ncol(raw_fcs)
+  
+  weighted_fcs <- vector(mode = "numeric", length = n_h)
+  
+  for (pos in seq.int(1,n_h)) {
+    
+    this_raw <- raw_fcs[, pos]
+    
+    this_vec_weight <- get_fc_weights_one_h(mat_cv_rmses_from_x,
+                                            vec_cv_rmse_from_rgdp, pos)
+    
+    this_weigthed_fc <- weighted.mean(this_raw, this_vec_weight$fc_weight)
+    
+    weighted_fcs[pos] <- this_weigthed_fc
+  }
+  
+  return(weighted_fcs)
+  
+}
+
+

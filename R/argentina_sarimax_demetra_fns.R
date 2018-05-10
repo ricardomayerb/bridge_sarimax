@@ -24,28 +24,6 @@ toc()
 fc_loglevel = myres[["fc"]]
 rgdp_loglevel = myres[["rgdp"]]
 rgdp_and_loglevel = myres[["rgdp_and_fc"]]
+rgdp_and_fc_yoy_from_exp = myres[["fc_yoy_from_exp"]]
 
-rgdp_and_level <- exp(rgdp_and_loglevel)
-crec_yoy <- 100 *  diff(rgdp_and_level, lag = 4)/lag.xts(rgdp_and_level, k = 4)
-crec_yoy
 
-# outer_cv_bsarimax <- function(number_of_outer_cv, data_path, train_span = 16,
-#                               h_max = 6, number_of_cv = 8, 
-#                               final_forecast_horizon = c(2019, 12)) {
-#   
-#   for (i in seq(1, number_of_outer_cv)  ) {
-#     myres <- bsarimax_as_function(data_path = data_path, 
-#                                   number_of_cv = number_of_cv,
-#                                   train_span = train_span, 
-#                                   final_forecast_horizon = final_forecast_horizon, 
-#                                   outer_cv_round = i)
-#   }
-#   
-# } 
-# 
-# number_of_outer_cv <-  2
-# # foo <- outer_cv_bsarimax(number_of_outer_cv = number_of_outer_cv, 
-# #                          data_path = data_path , train_span = 16,
-# #                               h_max = h_max, number_of_cv = number_of_cv, 
-# #                               final_forecast_horizon = c(2019, 12))
-# 
