@@ -10,7 +10,7 @@ library(stringr)
 bsarimax_as_function <- function(data_path, train_span = 16, h_max = 6,
                                  number_of_cv = 8, 
                                  final_forecast_horizon = c(2019, 12),
-                                 outer_cv_round = 0) {
+                                 outer_cv_round = 0, s4xreg = FALSE) {
   
   
   gdp_and_dates <- get_rgdp_and_dates(data_path)
@@ -102,19 +102,19 @@ bsarimax_as_function <- function(data_path, train_span = 16, h_max = 6,
   cv0_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  h_max =  h_max, n_cv = number_of_cv,
                      training_length = train_span,  y_order = rgdp_order, 
                      y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
-                     method = "ML")
+                     method = "ML", s4xreg = TRUE)
   
   # using one-lag xregs (k = 1)
   cv1_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 1),  h_max = h_max,
                      n_cv = number_of_cv, training_length = train_span,  y_order = rgdp_order, 
                      y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
-                     method = "ML")
+                     method = "ML", s4xreg = TRUE)
   
   # using two-lags xregs (k = 2)
   cv2_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 2),  h_max = h_max,
                      n_cv = number_of_cv, training_length = train_span,  y_order = rgdp_order, 
                      y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
-                     method = "ML")
+                     method = "ML", s4xreg = TRUE)
   
   cv_rgdp_e <- cv_arima(y_ts = rgdp_ts, h_max = h_max, n_cv = number_of_cv,
                         training_length = train_span,  y_order = rgdp_order, 
@@ -160,11 +160,13 @@ bsarimax_as_function <- function(data_path, train_span = 16, h_max = 6,
   
   
   all_arimax_0 <- my_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  y_order = rgdp_order, 
-                            y_seasonal = rgdp_seasonal, vec_of_names = monthly_names)
+                            y_seasonal = rgdp_seasonal, vec_of_names = monthly_names, s4xreg = TRUE)
+  
   all_arimax_1 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 1),  y_order = rgdp_order, 
-                            y_seasonal = rgdp_seasonal, vec_of_names = monthly_names)
+                            y_seasonal = rgdp_seasonal, vec_of_names = monthly_names, s4xreg = TRUE)
+  
   all_arimax_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 2),  y_order = rgdp_order, 
-                            y_seasonal = rgdp_seasonal, vec_of_names = monthly_names)
+                            y_seasonal = rgdp_seasonal, vec_of_names = monthly_names, s4xreg = TRUE)
   
   all_fcs_0 <- forecast_xreg(all_arimax_0, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
   all_fcs_1 <- forecast_xreg(all_arimax_1, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
@@ -571,7 +573,7 @@ extend_and_qtr <- function(data_mts, final_horizon_date, vec_of_names,
 
 my_arimax <- function(y_ts, xreg_ts, y_order, y_seasonal,
                       y_include_mean = FALSE, 
-                      vec_of_names = NULL) {
+                      vec_of_names = NULL, s4xreg = FALSE) {
  
   i = 1
   
@@ -609,13 +611,19 @@ my_arimax <- function(y_ts, xreg_ts, y_order, y_seasonal,
 
     n_x <- length(x_as_y)
     
-    this_arimax <- Arima(y = y_ts, xreg = x_as_y, 
-                         order = y_order, seasonal = y_seasonal,
-                         include.mean = y_include_mean )
-    
+    if(s4xreg) {
+      
+      this_arimax <- Arima(y = subset(y_ts, start = 5), xreg = diff(x_as_y, lag = 4), 
+                           order = y_order, seasonal = y_seasonal,
+                           include.mean = y_include_mean )
+    } else {
+      this_arimax <- Arima(y = y_ts, xreg = x_as_y, 
+                           order = y_order, seasonal = y_seasonal,
+                           include.mean = y_include_mean )
+    }
+
     arimax_list[[x_regressor]] <- this_arimax
 
-    
   }
   
   names(arimax_list) <- vec_of_names
@@ -629,7 +637,7 @@ my_arimax <- function(y_ts, xreg_ts, y_order, y_seasonal,
 cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
                       y_order, y_seasonal,
                       y_include_mean = FALSE, 
-                      vec_of_names = NULL, method = "CSS") {
+                      vec_of_names = NULL, method = "CSS", s4xreg = FALSE) {
   
   i = 1
   y_ts <- na.omit(y_ts)
@@ -647,6 +655,11 @@ cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
   
   xreg_as_y <- window(xreg_ts, start = c(y_start_year, y_start_quarter),
                    end = c(y_end_year, y_end_quarter), frequency = 4)
+  
+  if(s4xreg ) {
+    xreg_as_y <- diff(xreg_as_y, lag = 4)
+    y_ts <- subset(y_ts, start = 5)
+  }
   
   number_of_xregs <- ncol(as.matrix(xreg_ts))
   cv_errors_all_pairs_yx <- list_along(seq.int(1, number_of_xregs)) 
