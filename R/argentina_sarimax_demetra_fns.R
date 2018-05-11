@@ -18,7 +18,7 @@ tic()
 myres <- bsarimax_as_function(data_path = data_path, number_of_cv = number_of_cv,
                               train_span = train_span, h_max = h_max,
                               final_forecast_horizon = final_forecast_horizon,
-                              outer_cv_round = 0, s4xreg = TRUE)
+                              outer_cv_round = 0, s4xreg = FALSE)
 toc()
 
 level_fc_using_accu_level_weights <- myres$expo_final_rgdp_and_w_fc

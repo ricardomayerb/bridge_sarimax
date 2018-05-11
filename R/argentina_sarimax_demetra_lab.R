@@ -76,17 +76,17 @@ mdata_ext <- extend_and_qtr(data_mts = monthly_ts,
                                  fitted_arima_list = fit_arima_monthly_list_dem,
                                  start_date_gdp = gdp_and_dates[["gdp_start"]])
 
-doox <- mdata_ext[["series_xts"]]
+# doox <- mdata_ext[["series_xts"]]
 mdata_ext_ts <- mdata_ext[["series_ts"]]
 yoy_mdata_ext_ts <- diff(mdata_ext_ts, lag = 4)
 
-my_emae <- mdata_ext_ts[, "emae"]
+# my_emae <- mdata_ext_ts[, "emae"]
 
 rgdp_order <-  gdp_order[c("p", "d", "q")]
 rgdp_seasonal <-  gdp_order[c("P", "D", "Q")]
 
 
-my_emaeip <- mdata_ext_ts[, c("emae", "ip")]
+# my_emaeip <- mdata_ext_ts[, c("emae", "ip")]
 
 
 tic()
