@@ -154,7 +154,7 @@ cv0_rmse_each_h_yoy <- map(cv0_rmse_list_yoy, "same_h_rmse") %>% reduce(., rbind
   mutate(variable = monthly_names, lag = 0)
 cv1_rmse_each_h_yoy <- map(cv1_rmse_list_yoy, "same_h_rmse") %>% reduce(., rbind) %>% 
   mutate(variable = monthly_names, lag = 1)
-cv2_rmse_each_h_yoy<- map(cv2_rmse_list_yoy, "same_h_rmse") %>% reduce(., rbind) %>% 
+cv2_rmse_each_h_yoy <- map(cv2_rmse_list_yoy, "same_h_rmse") %>% reduce(., rbind) %>% 
   mutate(variable = monthly_names, lag = 2)
 cv_rmse_each_h_rgdp_yoy <- cv_rdgp_rmse_yoy[["same_h_rmse"]] %>% 
   mutate(variable = "rgdp", lag = 0)
@@ -213,17 +213,44 @@ fcs_using_yoy_weights <- get_weighted_fcs(raw_fcs = mat_of_raw_fcs,
 
 fcs_using_yoy_weights[ is.nan(fcs_using_yoy_weights)] <- rgdp_uncond_fc_mean[ is.nan(fcs_using_yoy_weights)]
 
+weigthed_fcs <- ts(weigthed_fcs, 
+                   start = stats::start(rgdp_uncond_fc_mean), 
+                   frequency = 4)
+fcs_using_yoy_weights <- ts(fcs_using_yoy_weights, 
+                            start = stats::start(rgdp_uncond_fc_mean), 
+                            frequency = 4)
+
+final_rgdp_and_w_fc <- ts(c(rgdp_ts, weigthed_fcs), frequency = 4,
+                              start = stats::start(rgdp_ts))
+
+final_rgdp_and_yoyw_fc <- ts(c(rgdp_ts, fcs_using_yoy_weights), frequency = 4,
+                          start = stats::start(rgdp_ts))
+
+expo_final_rgdp_and_w_fc <- exp(final_rgdp_and_w_fc)
+expo_final_rgdp_and_yoyw_fc <- exp(final_rgdp_and_yoyw_fc)
+
+yoy_growth_expo_final_rgdp_and_w_fc <- diff(expo_final_rgdp_and_w_fc, lag = 4)/lag.xts(expo_final_rgdp_and_w_fc, k = 4)
+yoy_growth_expo_final_rgdp_and_yoyw_fc <- diff(expo_final_rgdp_and_yoyw_fc, lag = 4)/lag.xts(expo_final_rgdp_and_yoyw_fc, k = 4)
+
+# return(list(cv_all_x_rmse_each_h,
+#             cv_all_x_rmse_each_h_yoy,
+#             cv_rmse_each_h_rgdp,
+#             cv_rmse_each_h_rgdp_yoy,
+#             expo_final_rgdp_and_w_fc,
+#             expo_final_rgdp_and_yoyw_fc,
+#             yoy_growth_expo_final_rgdp_and_w_fc,
+#             yoy_growth_expo_final_rgdp_and_yoyw_fc))
 
 # # example with weights_vec set to 0.2, 0.2, 0.2, 0.2, 0.1, 0.1
 # moo <- map(cv0_e_r, compute_rmse, h_max = 6, weights_vec = c(0.2, 0.2, 0.2, 0.2, 0.1, 0.1))
 # moo
 
 
-each_h_rmse_012 <- cbind(reduce(cv0_rmse_each_h, rbind),
-                         reduce(cv1_rmse_each_h, rbind),
-                         reduce(cv2_rmse_each_h, rbind)
-)
-
+# each_h_rmse_012 <- cbind(reduce(cv0_rmse_each_h, rbind),
+#                          reduce(cv1_rmse_each_h, rbind),
+#                          reduce(cv2_rmse_each_h, rbind)
+# )
+# 
 
 
 # ave_rmse_r_tbl <- as_tibble(ave_rmse_012) %>% 
