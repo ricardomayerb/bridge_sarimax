@@ -35,5 +35,24 @@ cv_rmse_level_rgdp <- myres$cv_rmse_each_h_rgdp
 
 
 m_arg <- read_excel("data/Argentina_m_analysis_rgdp.xlsx")
-m_all_rmse <- m_arg[, c("rmse1", "rmse2", "rmse3", "rmse4", "rmse5", "rmse6", "rmse7", "rmse8")]
-m_all_rmse$cond_exo <- m_arg[ , "cond_exo"]
+
+m_all_rmse <- m_arg[, c("cond_exo", "rmse1", "rmse2", "rmse3", "rmse4", "rmse5", "rmse6", "rmse7", "rmse8")]
+
+m_to_compare_rmse <- m_all_rmse %>% 
+  mutate_if(is.double, function(x) 0.01 * x) %>% 
+  mutate(pre_variable = str_remove(cond_exo, "S4.l"),
+         variable = str_extract(pre_variable, "([^\\s]+)"),
+         lag = ifelse(str_detect(pre_variable, "LS"), 
+                      ifelse(str_detect(pre_variable, "L2S"), 2, 1) , 0)
+                          ) %>% 
+  select(-pre_variable)
+
+m_to_compare_rmse_lag_0 <- m_to_compare_rmse %>% 
+  filter(lag == 0)
+
+cv_rmse_level_x_lag_0 <- cv_rmse_level_rgdp_conditional_on_x %>% 
+  filter(lag == 0)
+
+compare_rmse_lag_0 <- left_join(cv_rmse_level_x_lag_0, m_to_compare_rmse_lag_0,
+                                by = c("variable", "lag")) %>% 
+  dplyr::select( - c(lag,cond_exo))
