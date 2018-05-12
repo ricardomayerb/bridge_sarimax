@@ -55,4 +55,4 @@ cv_rmse_level_x_lag_0 <- cv_rmse_level_rgdp_conditional_on_x %>%
 
 compare_rmse_lag_0 <- left_join(cv_rmse_level_x_lag_0, m_to_compare_rmse_lag_0,
                                 by = c("variable", "lag")) %>% 
-  dplyr::select( - c(lag,cond_exo))
+  dplyr::select( -c(lag, cond_exo))

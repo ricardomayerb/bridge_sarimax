@@ -80,10 +80,31 @@ mdata_ext <- extend_and_qtr(data_mts = monthly_ts,
 mdata_ext_ts <- mdata_ext[["series_ts"]]
 yoy_mdata_ext_ts <- diff(mdata_ext_ts, lag = 4)
 
-# my_emae <- mdata_ext_ts[, "emae"]
 
 rgdp_order <-  gdp_order[c("p", "d", "q")]
 rgdp_seasonal <-  gdp_order[c("P", "D", "Q")]
+
+
+emae_ts <- ts(mdata_ext_ts[, "emae"], , start = stats::start(rgdp_ts),
+              end = stats::end(rgdp_ts), frequency = 4)
+
+# one_arimax_fp <- auto.arima(y = rgdp_ts, xreg = emae_ts)
+# two_arimax_fp <- auto.arima(y = rgdp_ts)
+# 
+# mod_arimax_fp <- Arima(y = rgdp_ts, xreg = emae_ts, order = rgdp_order,
+#                        seasonal = rgdp_seasonal)
+# 
+# foo <- cbind(emae_ts, xts::lag.xts(emae_ts, k = 1), lag.xts(emae_ts, k = 2))
+# colnames(foo) <- paste0("xlag_", 0:2)
+# foo
+# 
+# xlagmat <- c()
+# 
+# for (i in 0:2) {
+#   xlagmat <- cbind(xlagmat, lag.xts(emae_ts, k = i))
+# }
+# 
+# colnames(xlagmat) <- paste0("xlag_", 0:2)
 
 
 # my_emaeip <- mdata_ext_ts[, c("emae", "ip")]
@@ -94,19 +115,26 @@ tic()
 cv0_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  h_max =  h_max, n_cv = number_of_cv,
                      training_length = train_span,  y_order = rgdp_order, 
                      y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
-                     method = "ML", s4xreg = TRUE)
+                     method = "ML", s4xreg = FALSE)
 
 # using one-lag xregs (k = 1)
-cv1_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 1),  h_max = h_max,
-                      n_cv = number_of_cv, training_length = train_span,  y_order = rgdp_order, 
-                      y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
-                      method = "ML", s4xreg = TRUE)
+# xreg01 <- cbind()
+
+# cv1_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 1),  h_max = h_max,
+#                       n_cv = number_of_cv, training_length = train_span,  y_order = rgdp_order, 
+#                       y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
+#                       method = "ML", s4xreg = TRUE)
+
+cv1_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  h_max = h_max,
+                   n_cv = number_of_cv, training_length = train_span,  y_order = rgdp_order, 
+                   y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
+                   method = "ML", s4xreg = FALSE, xreg_lags = 0:1)
 
 # using two-lags xregs (k = 2)
-cv2_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 2),  h_max = h_max,
+cv2_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  h_max = h_max,
                       n_cv = number_of_cv, training_length = train_span,  y_order = rgdp_order, 
                       y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
-                      method = "ML", s4xreg = TRUE)
+                      method = "ML", s4xreg = FALSE, xreg_lags = 0:2)
 
 cv_rgdp_e <- cv_arima(y_ts = rgdp_ts, h_max = h_max, n_cv = number_of_cv,
                         training_length = train_span,  y_order = rgdp_order, 
@@ -166,28 +194,36 @@ cv_all_x_rmse_each_h_yoy <- rbind(cv0_rmse_each_h_yoy,
 
 
 
-foo <- get_fc_weights_one_h(mat_cv_rmses_from_x = cv_all_x_rmse_each_h
-                      , vec_cv_rmse_from_rgdp = cv_rmse_each_h_rgdp, pos = 6)
-
-foo_yoy <- get_fc_weights_one_h(mat_cv_rmses_from_x = cv_all_x_rmse_each_h_yoy
-                            , vec_cv_rmse_from_rgdp = cv_rmse_each_h_rgdp_yoy,
-                            pos = 6)
+# foo <- get_fc_weights_one_h(mat_cv_rmses_from_x = cv_all_x_rmse_each_h
+#                       , vec_cv_rmse_from_rgdp = cv_rmse_each_h_rgdp, pos = 6)
+# 
+# foo_yoy <- get_fc_weights_one_h(mat_cv_rmses_from_x = cv_all_x_rmse_each_h_yoy
+#                             , vec_cv_rmse_from_rgdp = cv_rmse_each_h_rgdp_yoy,
+#                             pos = 6)
 
 
 all_arimax_0 <- my_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  y_order = rgdp_order, 
-                        y_seasonal = rgdp_seasonal, vec_of_names = monthly_names, s4xreg = TRUE)
-all_arimax_1 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 1),  y_order = rgdp_order, 
-                           y_seasonal = rgdp_seasonal, vec_of_names = monthly_names, s4xreg = TRUE)
-all_arimax_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 2),  y_order = rgdp_order, 
-                           y_seasonal = rgdp_seasonal, vec_of_names = monthly_names, s4xreg = TRUE)
+                        y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
+                        s4xreg = FALSE)
 
-# all_fcs_0 <- forecast_xreg(all_arimax_0, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
-# all_fcs_1 <- forecast_xreg(all_arimax_1, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
-# all_fcs_2 <- forecast_xreg(all_arimax_2, mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+all_arimax_1 <- my_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  y_order = rgdp_order, 
+                           y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
+                          s4xreg = FALSE, xreg_lags = 0:1)
 
-all_fcs_0 <- forecast_xreg(all_arimax_0, yoy_mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
-all_fcs_1 <- forecast_xreg(all_arimax_1, yoy_mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
-all_fcs_2 <- forecast_xreg(all_arimax_2, yoy_mdata_ext_ts, h = h_max, vec_of_names = monthly_names)
+all_arimax_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  y_order = rgdp_order, 
+                           y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
+                          s4xreg = FALSE, xreg_lags = 0:2)
+
+# all_arimax_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 2),  y_order = rgdp_order, 
+#                           y_seasonal = rgdp_seasonal, vec_of_names = monthly_names, s4xreg = TRUE)
+
+
+all_fcs_0 <- forecast_xreg(all_arimax_0, mdata_ext_ts, h = h_max, 
+                           vec_of_names = monthly_names)
+all_fcs_1 <- forecast_xreg(all_arimax_1, mdata_ext_ts, h = h_max, 
+                           vec_of_names = monthly_names, xreg_lags = 0:1)
+all_fcs_2 <- forecast_xreg(all_arimax_2, mdata_ext_ts, h = h_max,
+                           vec_of_names = monthly_names, xreg_lags = 0:2)
 
 toc()
 
