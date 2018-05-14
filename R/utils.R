@@ -584,14 +584,7 @@ my_arimax <- function(y_ts, xreg_ts, y_order, y_seasonal,
   y_ts <- na.omit(y_ts)
   
   y_time <- time(y_ts)
-  y_yqrt <- as.yearqtr(y_time)
-
-  y_end_year <- year(max( y_yqrt ))
-  y_end_quarter <- quarter(max( y_yqrt ))
   
-  y_start_year <- year(min( y_yqrt ))
-  y_start_quarter <- quarter(min( y_yqrt ))
-
   n <- length(y_ts)
   
   x_names <- colnames(xreg_ts)
@@ -608,9 +601,25 @@ my_arimax <- function(y_ts, xreg_ts, y_order, y_seasonal,
       x_series <-  xreg_ts[ , x_regressor]
     }
     
+    x_time <- time(x_series)
     
-    x_as_y <- window(x_series, start = c(y_start_year, y_start_quarter),
-                              end = c(y_end_year, y_end_quarter),
+    if (min(x_time) >= min(y_time)) {
+      latest_start <- stats::start(x_series)
+    } else {
+      latest_start <- stats::start(y_series)
+    }
+    
+    if (max(x_time) <= max(y_time)) {
+      earliest_end <- stats::end(x_series)
+    } else {
+      earliest_end <- stats::end(y_series)
+    }
+    
+    y_ts <- ts(y_ts, start = latest_start, end = earliest_end, frequency = 4)
+
+    
+    x_as_y <- window(x_series, start = stats::start(y_ts),
+                              end = stats::end(y_ts),
                      frequency = 4)
 
     n_x <- length(x_as_y)
@@ -634,6 +643,10 @@ my_arimax <- function(y_ts, xreg_ts, y_order, y_seasonal,
                            order = y_order, seasonal = y_seasonal,
                            include.mean = y_include_mean )
     } else {
+      # print("y_ts")
+      # print(y_ts)
+      # print("x_as_y")
+      # print(x_as_y)
       this_arimax <- Arima(y = y_ts, xreg = x_as_y, 
                            order = y_order, seasonal = y_seasonal,
                            include.mean = y_include_mean )
