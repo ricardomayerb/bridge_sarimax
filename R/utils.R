@@ -755,17 +755,44 @@ cv_arimax <- function(y_ts, xreg_ts, h_max, n_cv, training_length,
       train_rgdp_and_fc <- ts(data = train_rgdp_and_fc,
                               frequency = 4,
                               start = stats::start(training_y))
+      
       train_rgdp_and_fc_yoy <- diff(train_rgdp_and_fc, lag = 4)
+      
       len_tf_yoy <- length(train_rgdp_and_fc_yoy)
+      
       fc_rgdp_yoy <- train_rgdp_and_fc_yoy[(len_tf_yoy - h_max + 1):len_tf_yoy]
+      
       train_and_test_yoy <- diff(c(training_y, test_y), lag = 4)
+      
       len_tt_yoy <- length(train_and_test_yoy)
+      
+      
       test_y_yoy <- train_and_test_yoy[(len_tt_yoy - h_max + 1):len_tt_yoy]
+      
       fc_error_of_yoy <- test_y_yoy - fc_rgdp_yoy
+      
       cv_yoy_errors_this_x[[i]] <- fc_error_of_yoy
       
       fc_error <- test_y - this_fc$mean
       cv_errors_this_x[[i]] <- fc_error
+
+      # print("test_y_yoy")
+      # print(test_y_yoy)
+      # 
+      # print("test_y")
+      # print(test_y)
+      # 
+      # print("fc_rgdp_yoy")
+      # print(fc_rgdp_yoy)
+      # 
+      # print("this_fc$mean")
+      # print(this_fc$mean)
+      #       
+      # print("fc_error_of_yoy")
+      # print(fc_error_of_yoy)
+      # 
+      # print("fc_error")
+      # print(fc_error)
       
     }
     

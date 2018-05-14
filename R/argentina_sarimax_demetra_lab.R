@@ -106,6 +106,23 @@ emae_ts <- ts(mdata_ext_ts[, "emae"], , start = stats::start(rgdp_ts),
 # 
 # colnames(xlagmat) <- paste0("xlag_", 0:2)
 
+emae_ts_yoy <- diff(emae_ts, lag = 4)
+length(emae_ts)
+train_emae <- subset(emae_ts, end = 49)
+length(train_emae)
+test_emae <- subset(emae_ts, start = 50)
+length(test_emae)
+emae_train_arima <- auto.arima(train_emae)
+fc_train_emae <- forecast(emae_train_arima, h = 8)
+fc_train_emae
+emae_train_and_fc <- ts(c(train_emae, fc_train_emae$mean), start = stats::start(train_emae), frequency = 4)
+emae_train_and_fc_yoy <- diff(emae_train_and_fc, lag = 4)
+emae_fc_yoy <- subset(emae_train_and_fc_yoy, start = 50)
+emae_error_yoy <- emae_test_yoy - emae_fc_yoy
+emae_level_error <- test_emae - fc_train_emae$mean
+
+
+
 
 # my_emaeip <- mdata_ext_ts[, c("emae", "ip")]
 
