@@ -13,10 +13,10 @@ h_max = 8 # last rgdp data is 2017 Q4
 number_of_cv = 8
 train_span = 16
 
-country_name <- "Paraguay"
+country_name <- "Bolivia"
 data_path <- paste0("./data/excel_data/", country_name,".xlsx")
 m_analysis_path <- paste0("data/", country_name,"_m_analysis_rgdp.xlsx")
-rds_file_name = paste0("sarimax_objects_", country_name,".rds")
+rds_file_name = paste0("./data/sarimax_objects_", country_name,".rds")
   
 tic()
 myres <- bsarimax_as_function(data_path = data_path, number_of_cv = number_of_cv,

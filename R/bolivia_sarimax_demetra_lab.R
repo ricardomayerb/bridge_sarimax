@@ -135,13 +135,6 @@ cv0_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  h_max =  h_max, n_cv
                      method = "ML", s4xreg = FALSE)
 
 # using one-lag xregs (k = 1)
-# xreg01 <- cbind()
-
-# cv1_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 1),  h_max = h_max,
-#                       n_cv = number_of_cv, training_length = train_span,  y_order = rgdp_order, 
-#                       y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
-#                       method = "ML", s4xreg = TRUE)
-
 cv1_e <- cv_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  h_max = h_max,
                    n_cv = number_of_cv, training_length = train_span,  y_order = rgdp_order, 
                    y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
