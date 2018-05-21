@@ -106,20 +106,20 @@ emae_ts <- ts(mdata_ext_ts[, "emae"], , start = stats::start(rgdp_ts),
 # 
 # colnames(xlagmat) <- paste0("xlag_", 0:2)
 
-emae_ts_yoy <- diff(emae_ts, lag = 4)
-length(emae_ts)
-train_emae <- subset(emae_ts, end = 49)
-length(train_emae)
-test_emae <- subset(emae_ts, start = 50)
-length(test_emae)
-emae_train_arima <- auto.arima(train_emae)
-fc_train_emae <- forecast(emae_train_arima, h = 8)
-fc_train_emae
-emae_train_and_fc <- ts(c(train_emae, fc_train_emae$mean), start = stats::start(train_emae), frequency = 4)
-emae_train_and_fc_yoy <- diff(emae_train_and_fc, lag = 4)
-emae_fc_yoy <- subset(emae_train_and_fc_yoy, start = 50)
-emae_error_yoy <- emae_test_yoy - emae_fc_yoy
-emae_level_error <- test_emae - fc_train_emae$mean
+# emae_ts_yoy <- diff(emae_ts, lag = 4)
+# length(emae_ts)
+# train_emae <- subset(emae_ts, end = 49)
+# length(train_emae)
+# test_emae <- subset(emae_ts, start = 50)
+# length(test_emae)
+# emae_train_arima <- auto.arima(train_emae)
+# fc_train_emae <- forecast(emae_train_arima, h = 8)
+# fc_train_emae
+# emae_train_and_fc <- ts(c(train_emae, fc_train_emae$mean), start = stats::start(train_emae), frequency = 4)
+# emae_train_and_fc_yoy <- diff(emae_train_and_fc, lag = 4)
+# emae_fc_yoy <- subset(emae_train_and_fc_yoy, start = 50)
+# emae_error_yoy <- emae_test_yoy - emae_fc_yoy
+# emae_level_error <- test_emae - fc_train_emae$mean
 
 
 
@@ -231,9 +231,6 @@ all_arimax_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = mdata_ext_ts,  y_order = rgd
                            y_seasonal = rgdp_seasonal, vec_of_names = monthly_names,
                           s4xreg = FALSE, xreg_lags = 0:2)
 
-# all_arimax_2 <- my_arimax(y_ts = rgdp_ts, xreg_ts = lag.xts(mdata_ext_ts, k = 2),  y_order = rgdp_order, 
-#                           y_seasonal = rgdp_seasonal, vec_of_names = monthly_names, s4xreg = TRUE)
-
 
 all_fcs_0 <- forecast_xreg(all_arimax_0, mdata_ext_ts, h = h_max, 
                            vec_of_names = monthly_names)
@@ -248,9 +245,23 @@ all_fcs <- tibble(fc_0 = all_fcs_0, fc_1 = all_fcs_1, fc_2 = all_fcs_2,
                     id_fc = monthly_names) %>%
   gather(key = "type_fc", value = "fc", -id_fc) %>% 
   mutate(lag = as.integer(str_remove(type_fc, "fc_")),
-         raw_rgdp_fc = map(fc, "mean"))
+         raw_rgdp_fc = map(fc, "mean")) %>% 
+  mutate(armapar = map(fc, c("model", "arma")),
+         arima_order = map(armapar, function(x) x[c(1, 6, 2)]),
+         arima_seasonal = map(armapar, function(x) x[c(3, 7, 4)])  
+         )
 
-mat_of_raw_fcs <- reduce(all_fcs$raw_rgdp_fc, rbind)
+var_lag_order_season <- all_fcs %>% 
+  dplyr::select(id_fc, lag, arima_order, arima_seasonal) %>% 
+  rename(variable = id_fc, lag = lag)
+
+rgdp_var_lag_order_season <- tibble(
+  variable = "rgdp", lag = 0, 
+  arima_order = list(rgdp_order), arima_seasonal = list(rgdp_seasonal)) 
+
+var_lag_order_season <- rbind(rgdp_var_lag_order_season, var_lag_order_season)
+
+mat_of_raw_fcs <- reduce(all_fcs$raw_rgdp_fc, rbind) 
 
 
 weigthed_fcs <- get_weighted_fcs(raw_fcs = mat_of_raw_fcs,
