@@ -25,6 +25,8 @@ myres <- bsarimax_as_function(data_path = data_path, number_of_cv = number_of_cv
                               outer_cv_round = 0, s4xreg = FALSE)
 toc()
 
+var_lag_order_season <- myres$var_lag_order_season
+
 level_fc_using_accu_level_weights <- myres$expo_final_rgdp_and_w_fc
 
 level_fc_using_accu_yoy_weights <- myres$expo_final_rgdp_and_yoyw_fc
@@ -62,7 +64,9 @@ compare_rmse <- rbind(cv_rmse_level_rgdp, cv_rmse_level_rgdp_conditional_on_x) %
 compare_rmse_yoy <- rbind(cv_rmse_yoy_rgdp, 
                           cv_rmse_yoy_rgdp_conditional_on_x)
 
+
 country_objects <- list(
+  var_lag_order_season = var_lag_order_season,
   compare_rmse = compare_rmse, 
   compare_rmse_yoy = compare_rmse_yoy, 
   yoy_fc_using_accu_level_weights = yoy_fc_using_accu_level_weights,

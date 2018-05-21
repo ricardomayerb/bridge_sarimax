@@ -151,18 +151,7 @@ bsarimax_as_function <- function(data_path, train_span = 16, h_max = 6,
   cv_rdgp_rmse <- compute_rmse(cv_rgdp_e, h_max = h_max, n_cv = number_of_cv)
   cv_rdgp_rmse_yoy <- compute_rmse(cv_rgdp_e_yoy, h_max = h_max, n_cv = number_of_cv)
   
-  # cv0_rmse_wm_list <- map(cv0_rmse_list, "weighted_same_h")
-  # cv0_rmse_wm <- map_dbl(cv0_rmse_list, "weighted_same_h")
-  # cv1_rmse_wm <- map_dbl(cv1_rmse_list, "weighted_same_h")
-  # cv2_rmse_wm <- map_dbl(cv2_rmse_list, "weighted_same_h")
-  # 
-  # cv0_rmse_wm_yoy <- map_dbl(cv0_rmse_list_yoy, "weighted_same_h")
-  # cv1_rmse_wm_yoy <- map_dbl(cv1_rmse_list_yoy, "weighted_same_h")
-  # cv2_rmse_wm_yoy <- map_dbl(cv2_rmse_list_yoy, "weighted_same_h")
-  # 
-  # cv_rmse_rgdp <- cv_rdgp_rmse[["weighted_same_h"]]
-  # cv_rmse_rgdp_yoy <- cv_rdgp_rmse_yoy[["weighted_same_h"]]
- 
+  
   cv0_rmse_each_h <- map(cv0_rmse_list, "same_h_rmse") %>% reduce(., rbind) %>% 
     mutate(variable = monthly_names, lag = 0)
   cv1_rmse_each_h <- map(cv1_rmse_list, "same_h_rmse") %>% reduce(., rbind) %>% 
@@ -213,7 +202,22 @@ bsarimax_as_function <- function(data_path, train_span = 16, h_max = 6,
                     id_fc = monthly_names) %>%
     gather(key = "type_fc", value = "fc", -id_fc) %>% 
     mutate(lag = as.integer(str_remove(type_fc, "fc_")),
-           raw_rgdp_fc = map(fc, "mean"))
+           raw_rgdp_fc = map(fc, "mean")) %>% 
+    mutate(armapar = map(fc, c("model", "arma")),
+           arima_order = map(armapar, function(x) x[c(1, 6, 2)]),
+           arima_seasonal = map(armapar, function(x) x[c(3, 7, 4)])  
+    )
+  
+  var_lag_order_season <- all_fcs %>% 
+    dplyr::select(id_fc, lag, arima_order, arima_seasonal) %>% 
+    rename(variable = id_fc, lag = lag)
+  
+  rgdp_var_lag_order_season <- tibble(
+    variable = "rgdp", lag = 0, 
+    arima_order = list(rgdp_order), arima_seasonal = list(rgdp_seasonal)) 
+  
+  var_lag_order_season <- rbind(rgdp_var_lag_order_season, var_lag_order_season)
+  
   
   mat_of_raw_fcs <- reduce(all_fcs$raw_rgdp_fc, rbind)
   
@@ -257,7 +261,8 @@ bsarimax_as_function <- function(data_path, train_span = 16, h_max = 6,
               expo_final_rgdp_and_w_fc = expo_final_rgdp_and_w_fc,
               expo_final_rgdp_and_yoyw_fc = expo_final_rgdp_and_yoyw_fc,
               yoy_growth_expo_final_rgdp_and_w_fc = yoy_growth_expo_final_rgdp_and_w_fc,
-              yoy_growth_expo_final_rgdp_and_yoyw_fc = yoy_growth_expo_final_rgdp_and_yoyw_fc))
+              yoy_growth_expo_final_rgdp_and_yoyw_fc = yoy_growth_expo_final_rgdp_and_yoyw_fc,
+              var_lag_order_season = var_lag_order_season))
 
   }
 
@@ -606,13 +611,13 @@ my_arimax <- function(y_ts, xreg_ts, y_order, y_seasonal,
     if (min(x_time) >= min(y_time)) {
       latest_start <- stats::start(x_series)
     } else {
-      latest_start <- stats::start(y_series)
+      latest_start <- stats::start(y_ts)
     }
     
     if (max(x_time) <= max(y_time)) {
       earliest_end <- stats::end(x_series)
     } else {
-      earliest_end <- stats::end(y_series)
+      earliest_end <- stats::end(y_ts)
     }
     
     y_ts <- ts(y_ts, start = latest_start, end = earliest_end, frequency = 4)
