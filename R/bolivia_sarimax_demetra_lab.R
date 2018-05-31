@@ -33,16 +33,6 @@ rgdp_ts <- ts(data = gdp_and_dates[["gdp_data"]],
 rgdp_ts <- log(rgdp_ts)
 
 
-# rgdp_ts_cv <- cutback_ts(single_ts = rgdp_ts, nrows_to_cut = 3)
-# ts.union(rgdp_ts, rgdp_ts_cv)
-# 
-# # funciona!!! pero debe volver a ser ts
-# monthly_data_cv <- apply(monthly_ts, MARGIN = 2, FUN = cutback_ts, nrows_to_cut = 2)
-# 
-# monthly_ts_cv <- ts(monthly_data_cv, 
-#                     start = stats::start(monthly_ts),
-#                     frequency = 12)
-
 
 
 demetra_output <- get_demetra_params(data_path)

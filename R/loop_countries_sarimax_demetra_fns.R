@@ -79,7 +79,9 @@ for (name in country_names) {
     yoy_fc_using_accu_level_weights = yoy_fc_using_accu_level_weights,
     yoy_fc_using_accu_yoy_weights = yoy_fc_using_accu_yoy_weights,
     level_fc_using_accu_level_weights = level_fc_using_accu_level_weights,
-    level_fc_using_accu_yoy_weights = level_fc_using_accu_yoy_weights)
+    level_fc_using_accu_yoy_weights = level_fc_using_accu_yoy_weights,
+    extended_x_data_ts = myres$mdata_ext_ts,
+    rgdp_ts_in_arima = myres$rgdp_ts_in_arima)
   
   
   saveRDS(country_objects, file = rds_file_name)
